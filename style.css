@@ -176,7 +176,7 @@ body.login-page .login-container {
 }
 
 .no-results td {
-  height: 200px; /* Enough height for visual spacing */
+  height: 50px; /* Enough height for visual spacing */
   padding: 0;
 }
 
@@ -253,3 +253,42 @@ body.login-page .login-container {
 .nav-link:hover {
   text-decoration: underline;
 }
+
+.league-info p {
+  margin: 0.5rem 0;
+  font-size: 1rem;
+}
+
+.category-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 20px;
+}
+
+.category-table th,
+.category-table td {
+  border: 1px solid #ccc;
+  padding: 8px;
+  text-align: left;
+}
+
+select,
+  input[type="number"],
+  input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    margin: 8px 0 16px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 16px;
+    background-color: #f9f9f9;
+    box-sizing: border-box;
+    transition: border-color 0.3s;
+  }
+
+  select:focus,
+  input:focus {
+    border-color: #007BFF;
+    outline: none;
+    background-color: #fff;
+  }

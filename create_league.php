@@ -34,7 +34,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $stmt = $pdo->prepare("INSERT INTO league (league_name, location, start_date, end_date, status) VALUES (?, ?, ?, ?, ?)");
             $stmt->execute([$league_name, $location, $start_date, $end_date, $status]);
 
-            header("Location: league_dashboard.php?message=League+created+successfully");
+            $league_id = $pdo->lastInsertId();
+
+            header("Location: league_details.php?id=" . $league_id);
             exit;
         }
     } else {
