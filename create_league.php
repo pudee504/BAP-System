@@ -14,30 +14,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $end_date = $_POST['end_date'];
 
     if ($league_name && $start_date && $end_date) {
-        // Check for duplicates
-        $checkSql = "SELECT COUNT(*) FROM league WHERE league_name = :league_name AND location = :location";
-        $checkStmt = $pdo->prepare($checkSql);
-        $checkStmt->execute([
-            ':league_name' => $league_name,
-            ':location' => $location
-        ]);
-        $existingCount = $checkStmt->fetchColumn();
-
-        if ($existingCount > 0) {
-            $error = "A league with this name and location already exists.";
+        if (strtotime($end_date) < strtotime($start_date)) {
+            $error = "End date cannot be earlier than start date.";
         } else {
-            // Determine league status
-            $today = date('Y-m-d');
-            $status = ($today < $start_date) ? 'Upcoming' : 'Active';
+            // Check for duplicates
+            $checkSql = "SELECT COUNT(*) FROM league WHERE league_name = :league_name AND location = :location";
+            $checkStmt = $pdo->prepare($checkSql);
+            $checkStmt->execute([
+                ':league_name' => $league_name,
+                ':location' => $location
+            ]);
+            $existingCount = $checkStmt->fetchColumn();
 
-            // Insert the league
-            $stmt = $pdo->prepare("INSERT INTO league (league_name, location, start_date, end_date, status) VALUES (?, ?, ?, ?, ?)");
-            $stmt->execute([$league_name, $location, $start_date, $end_date, $status]);
+            if ($existingCount > 0) {
+                $error = "A league with this name and location already exists.";
+            } else {
+                // Determine league status
+                $today = date('Y-m-d');
+                $status = ($today < $start_date) ? 'Upcoming' : 'Active';
 
-            $league_id = $pdo->lastInsertId();
+                // Insert the league
+                $stmt = $pdo->prepare("INSERT INTO league (league_name, location, start_date, end_date, status) VALUES (?, ?, ?, ?, ?)");
+                $stmt->execute([$league_name, $location, $start_date, $end_date, $status]);
 
-            header("Location: league_details.php?id=" . $league_id);
-            exit;
+                $league_id = $pdo->lastInsertId();
+
+                header("Location: league_details.php?id=" . $league_id);
+                exit;
+            }
         }
     } else {
         $error = "League name, start date, and end date are required.";

@@ -3,7 +3,8 @@ session_start();
 
 // Protect the page
 if (!isset($_SESSION['user_id'])) {
-    header('Location: index.php?error=Please login first');
+    $_SESSION['error'] = 'Please login first';
+    header('Location: index.php');
     exit;
 }
 
@@ -30,7 +31,7 @@ $leagues = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <meta charset="UTF-8">
     <title>Dashboard - League Management</title>
     <link rel="stylesheet" href="style.css">
-    
+     
 </head>
 <body>
 <?php include 'header.php'; ?>
@@ -58,7 +59,12 @@ $leagues = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 <?php if (count($leagues) > 0): ?>
                     <?php foreach ($leagues as $league): ?>
                         <tr>
-                            <td><?= htmlspecialchars($league['league_name']) ?></td>
+                            <td>
+                              <a href="league_details.php?id=<?= $league['id'] ?>">
+                                <?= htmlspecialchars($league['league_name']) ?>
+                              </a>
+                            </td>
+
                             <td><?= htmlspecialchars($league['location']) ?></td>
                             <td><?= htmlspecialchars($league['status']) ?></td>
                         </tr>

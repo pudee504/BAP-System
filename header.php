@@ -5,7 +5,7 @@
       <img src="bap_logo.jpg" alt="Logo" class="logo-img">
     </div>
     <nav class="nav-bar">
-      <a href="#" class="nav-link">Home</a>
+      <a href="dashboard.php" class="nav-link">Home</a>
     </nav>
   </div>
   <div class="user-menu">

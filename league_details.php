@@ -65,7 +65,11 @@ $categories = $catStmt->fetchAll();
       <?php foreach ($categories as $index => $category): ?>
         <tr>
           <td><?= $index + 1 ?></td>
-          <td><?= htmlspecialchars($category['category_name']) ?></td>
+          <td>
+            <a href="category_details.php?category_id=<?= $category['id'] ?>">
+              <?= htmlspecialchars($category['category_name']) ?>
+            </a>        
+          </td>
         </tr>
       <?php endforeach; ?>
     </tbody>
