@@ -53,27 +53,35 @@ $categories = $catStmt->fetchAll();
 ?>
 
 <?php if ($categories): ?>
-  <h2>Categories</h2>
-  <table class="category-table">
-    <thead>
+  <!-- ... Top of your file remains unchanged ... -->
+
+<h2>Categories</h2>
+<table class="category-table">
+  <thead>
+    <tr>
+      <th>No.</th>
+      <th>Category Name</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+    <?php foreach ($categories as $index => $category): ?>
       <tr>
-        <th>#</th>
-        <th>Category Name</th>
+        <td><?= $index + 1 ?></td>
+        <td>
+          <a href="category_details.php?category_id=<?= $category['id'] ?>">
+            <?= htmlspecialchars($category['category_name']) ?>
+          </a>
+        </td>
+        <td>
+          <a href="edit_category.php?id=<?= $category['id'] ?>&league_id=<?= $league_id ?>">Edit</a> |
+          <a href="delete_category.php?id=<?= $category['id'] ?>&league_id=<?= $league_id ?>" onclick="return confirm('Are you sure you want to delete this category?');">Delete</a>
+        </td>
       </tr>
-    </thead>
-    <tbody>
-      <?php foreach ($categories as $index => $category): ?>
-        <tr>
-          <td><?= $index + 1 ?></td>
-          <td>
-            <a href="category_details.php?category_id=<?= $category['id'] ?>">
-              <?= htmlspecialchars($category['category_name']) ?>
-            </a>        
-          </td>
-        </tr>
-      <?php endforeach; ?>
-    </tbody>
-  </table>
+    <?php endforeach; ?>
+  </tbody>
+</table>
+
 <?php else: ?>
   <p>No categories created yet.</p>
 <?php endif; ?>

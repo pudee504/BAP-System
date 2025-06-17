@@ -49,12 +49,14 @@ $leagues = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="table-wrapper">
         <table class="leagues-table">
             <thead>
-                <tr>
-                    <th>League Name</th>
-                    <th>Location</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
+    <tr>
+        <th>League Name</th>
+        <th>Location</th>
+        <th>Status</th>
+        <th>Actions</th> <!-- New -->
+    </tr>
+</thead>
+
             <tbody>
                 <?php if (count($leagues) > 0): ?>
                     <?php foreach ($leagues as $league): ?>
@@ -67,6 +69,10 @@ $leagues = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
                             <td><?= htmlspecialchars($league['location']) ?></td>
                             <td><?= htmlspecialchars($league['status']) ?></td>
+                            <td>
+  <a href="edit_league.php?id=<?= $league['id'] ?>">Edit</a> |
+  <a href="delete_league.php?id=<?= $league['id'] ?>" onclick="return confirm('Are you sure you want to delete this league?');">Delete</a>
+</td>
                         </tr>
                     <?php endforeach; ?>
                 <?php else: ?>

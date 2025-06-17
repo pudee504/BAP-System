@@ -17,7 +17,7 @@ $stmt->execute([$category_id]);
 $category = $stmt->fetch();
 
 // Get how many teams are already registered
-$teamStmt = $pdo->prepare("SELECT * FROM team WHERE category_id = ?");
+$teamStmt = $pdo->prepare("SELECT * FROM team WHERE category_id = ? ORDER BY seed ASC");
 $teamStmt->execute([$category_id]);
 $teams = $teamStmt->fetchAll();
 $team_count = count($teams);
@@ -107,16 +107,49 @@ $allow_add_team = $is_round_robin || $remaining_slots > 0;
 <?php endif; ?>
 
 
-<!-- List of registered teams -->
-<ul>
-  <?php foreach ($teams as $team): ?>
-    <li>
-      <a href="team_details.php?team_id=<?= $team['id'] ?>">
-        <?= htmlspecialchars($team['team_name']) ?>
-      </a>
-    </li>
-  <?php endforeach; ?>
-</ul>
+<!-- Table of registered teams -->
+<?php if ($teams): ?>
+  <table class="category-table">
+    <thead>
+      <tr>
+        <th>Seed</th>
+        <th>Team Name</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody id="teamTableBody">
+      <?php foreach ($teams as $team): ?>
+        <tr data-seed="<?= $team['seed'] ?>">
+          <td>
+            <select onchange="updateSeed(this, <?= $team['id'] ?>)">
+              <option value="">--</option>
+              <?php for ($i = 1; $i <= count($teams); $i++): ?>
+                <option value="<?= $i ?>" <?= ($team['seed'] == $i ? 'selected' : '') ?>><?= $i ?></option>
+              <?php endfor; ?>
+            </select>
+          </td>
+          <td>
+            <a href="team_details.php?team_id=<?= $team['id'] ?>" style="text-decoration: none; color: #007bff;">
+              <?= htmlspecialchars($team['team_name']) ?>
+            </a>
+          </td>
+          <td>
+            <a href="edit_team.php?team_id=<?= $team['id'] ?>">Edit</a> |
+            <form action="delete_team.php" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this team?');">
+              <input type="hidden" name="team_id" value="<?= $team['id'] ?>">
+              <input type="hidden" name="category_id" value="<?= $category_id ?>">
+              <button type="submit" style="background: none; border: none; color: red; cursor: pointer;">Delete</button>
+            </form>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+    </tbody>
+  </table>
+<?php else: ?>
+  <p>No teams registered yet.</p>
+<?php endif; ?>
+
+
 
 
     </div>
@@ -142,6 +175,28 @@ $allow_add_team = $is_round_robin || $remaining_slots > 0;
       document.querySelector([onclick="showTab('${id}')"]).classList.add('active');
       document.getElementById(id).classList.add('active');
     }
+
+    
   </script>
+  <script>
+function updateSeed(selectElem, teamId) {
+  const newSeed = selectElem.value;
+
+  fetch('update_seed.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: 'team_id=' + teamId + '&new_seed=' + newSeed
+  })
+  .then(res => res.text())
+  .then(response => {
+    if (response.trim() === 'success') {
+      location.reload(); // Refresh to reorder the table
+    } else {
+      alert('Failed to update seed.');
+    }
+  });
+}
+</script>
+
 </body>
 </html>
