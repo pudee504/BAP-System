@@ -5,7 +5,6 @@ session_start();
 // Validate category ID
 $category_id = filter_var($_GET['category_id'], FILTER_VALIDATE_INT);
 
-
 // Fetch category details
 $stmt = $pdo->prepare("
     SELECT c.category_name, f.format_name, cf.format_id, cf.num_teams, cf.num_groups, cf.advance_per_group
@@ -111,9 +110,14 @@ $allow_add_team = $is_round_robin || $remaining_slots > 0;
 <!-- List of registered teams -->
 <ul>
   <?php foreach ($teams as $team): ?>
-    <li><?= htmlspecialchars($team['team_name']) ?></li>
+    <li>
+      <a href="team_details.php?team_id=<?= $team['id'] ?>">
+        <?= htmlspecialchars($team['team_name']) ?>
+      </a>
+    </li>
   <?php endforeach; ?>
-  </ul>
+</ul>
+
 
     </div>
 

@@ -37,7 +37,10 @@ $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM team WHERE category_id = ?");
 $checkStmt->execute([$category_id]);
 $current_count = (int) $checkStmt->fetchColumn();
 
-// Only restrict if it's not Round Robin
+// Logic:
+// - If not round robin and max reached → disallow
+// - If round robin and current_count >= max_teams → allow and update num_teams
+// - If round robin and current_count < max_teams → allow but DO NOT update num_teams
 if (!$is_round_robin && $current_count >= $max_teams) {
     die("Team limit reached. You cannot add more teams.");
 }
@@ -45,12 +48,12 @@ if (!$is_round_robin && $current_count >= $max_teams) {
 // Add the team
 $insert = $pdo->prepare("INSERT INTO team (category_id, team_name) VALUES (?, ?)");
 $insert->execute([$category_id, $team_name]);
-if ($is_round_robin) {
+
+// Only update num_teams if it's Round Robin AND we're adding beyond the initial limit
+if ($is_round_robin && $current_count >= $max_teams) {
     $update = $pdo->prepare("UPDATE category_format SET num_teams = num_teams + 1 WHERE category_id = ?");
     $update->execute([$category_id]);
 }
 
-
 header("Location: category_details.php?category_id=" . $category_id . "#teams");
-
 exit;
