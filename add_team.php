@@ -14,9 +14,9 @@ if (!$category_id || !$team_name) {
     die("Missing category or team name.");
 }
 
-// Get the allowed number of teams
+// Get format and allowed team limit
 $stmt = $pdo->prepare("
-    SELECT cf.num_teams
+    SELECT cf.num_teams, cf.format_id
     FROM category_format cf
     JOIN category c ON c.id = cf.category_id
     WHERE c.id = ?
@@ -29,19 +29,28 @@ if (!$info) {
 }
 
 $max_teams = (int) $info['num_teams'];
+$format_id = (int) $info['format_id'];
+$is_round_robin = ($format_id === 3);
 
-// Check how many teams are already added
+// Count currently registered teams
 $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM team WHERE category_id = ?");
 $checkStmt->execute([$category_id]);
 $current_count = (int) $checkStmt->fetchColumn();
 
-if ($current_count >= $max_teams) {
+// Only restrict if it's not Round Robin
+if (!$is_round_robin && $current_count >= $max_teams) {
     die("Team limit reached. You cannot add more teams.");
 }
 
 // Add the team
 $insert = $pdo->prepare("INSERT INTO team (category_id, team_name) VALUES (?, ?)");
 $insert->execute([$category_id, $team_name]);
+if ($is_round_robin) {
+    $update = $pdo->prepare("UPDATE category_format SET num_teams = num_teams + 1 WHERE category_id = ?");
+    $update->execute([$category_id]);
+}
 
-header("Location: category_details.php?category_id=" . $category_id);
+
+header("Location: category_details.php?category_id=" . $category_id . "#teams");
+
 exit;

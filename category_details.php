@@ -3,15 +3,12 @@ require 'db.php';
 session_start();
 
 // Validate category ID
-if (!isset($_GET['category_id']) || !filter_var($_GET['category_id'], FILTER_VALIDATE_INT)) {
-    die("Missing or invalid category ID.");
-}
+$category_id = filter_var($_GET['category_id'], FILTER_VALIDATE_INT);
 
-$category_id = (int) $_GET['category_id'];
 
 // Fetch category details
 $stmt = $pdo->prepare("
-    SELECT c.category_name, f.format_name, cf.num_teams, cf.num_groups, cf.advance_per_group
+    SELECT c.category_name, f.format_name, cf.format_id, cf.num_teams, cf.num_groups, cf.advance_per_group
     FROM category c
     JOIN category_format cf ON c.id = cf.category_id
     JOIN format f ON cf.format_id = f.id
@@ -88,26 +85,35 @@ if (!$category) {
 
     <!-- Tab Contents -->
     <div class="tab-content active" id="teams">
-      <h2>Teams (<?= $team_count ?>/<?= $category['num_teams'] ?> Registered)</h2>
 
-<?php if ($remaining_slots > 0): ?>
+    <?php
+$is_round_robin = ($category['format_id'] == 3);
+$allow_add_team = $is_round_robin || $remaining_slots > 0;
+?>
+
+<h2>Teams (<?= $team_count ?><?= !$is_round_robin ? ' / ' . $category['num_teams'] : '' ?> Registered)</h2>
+
+<?php if (!$allow_add_team): ?>
+  <p><strong>All team slots are filled.</strong></p>
+<?php else: ?>
   <form action="add_team.php" method="POST">
     <input type="hidden" name="category_id" value="<?= $category_id ?>">
     <label for="team_name">Team Name</label>
     <input type="text" name="team_name" id="team_name" required>
     <button type="submit">Add Team</button>
   </form>
-  <p><?= $remaining_slots ?> team slot(s) left</p>
-<?php else: ?>
-  <p><strong>All team slots are filled.</strong></p>
+  <?php if (!$is_round_robin): ?>
+    <p><?= $remaining_slots ?> team slot(s) left</p>
+  <?php endif; ?>
 <?php endif; ?>
+
 
 <!-- List of registered teams -->
 <ul>
   <?php foreach ($teams as $team): ?>
     <li><?= htmlspecialchars($team['team_name']) ?></li>
   <?php endforeach; ?>
-</ul>
+  </ul>
 
     </div>
 
@@ -129,7 +135,7 @@ if (!$category) {
       document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
       document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
 
-      document.querySelector(`[onclick="showTab('${id}')"]`).classList.add('active');
+      document.querySelector([onclick="showTab('${id}')"]).classList.add('active');
       document.getElementById(id).classList.add('active');
     }
   </script>
