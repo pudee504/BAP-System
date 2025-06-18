@@ -34,7 +34,7 @@ $leagues = $stmt->fetchAll(PDO::FETCH_ASSOC);
      
 </head>
 <body>
-<?php include 'header.php'; ?>
+<?php include 'includes/header.php'; ?>
 
 <div class="dashboard-container">
     <h1 style="margin-bottom: 20px">Leagues</h1>

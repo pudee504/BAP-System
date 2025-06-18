@@ -28,7 +28,7 @@ if (!$league) {
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<?php include 'header.php'; ?>
+<?php include 'includes/header.php'; ?>
 
 <div class="dashboard-container">
   <h1><?= htmlspecialchars($league['league_name']) ?> </h1>

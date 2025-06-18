@@ -59,7 +59,7 @@ $player_list = $players->fetchAll();
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<?php include 'header.php'; ?>
+<?php include 'includes/header.php'; ?>
 <div class="dashboard-container">
   <h1>Team: <?= htmlspecialchars($team['team_name']) ?></h1>
   <p><strong>Category:</strong> <?= htmlspecialchars($team['category_name']) ?></p>
