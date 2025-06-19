@@ -23,14 +23,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <!DOCTYPE html>
 <html>
-<head><title>Edit Team</title></head>
+<head>
+    <title>Edit Team</title>
+    <link rel="stylesheet" href="style.css">
+</head>
 <body class="login-page">
     <div class="login-container">
 <h1>Edit Team</h1>
 <form method="POST">
     <label>Team Name</label>
     <input type="text" name="team_name" value="<?= htmlspecialchars($team['team_name']) ?>" required>
-    <button type="submit">Update</button>
+    <button class="login-button"type="submit">Update</button>
 </form>
 <p><a href="category_details.php?category_id=<?= $team['category_id'] ?>#teams">← Back to Category</a></p>
 </div>

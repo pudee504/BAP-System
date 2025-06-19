@@ -3,6 +3,15 @@ session_start();
 $active_tab = $_GET['tab'] ?? 'teams';
 
 require 'includes/category_info.php';
+
+// NEW: check if schedule is already generated
+$check = $pdo->prepare("SELECT schedule_generated FROM category WHERE id = ?");
+$check->execute([$category_id]);
+$scheduleInfo = $check->fetch();
+$scheduleGenerated = $scheduleInfo['schedule_generated'];
+
+$active_tab = $_GET['tab'] ?? 'teams';
+
 ?>
 
 <!DOCTYPE html>
@@ -37,6 +46,16 @@ require 'includes/category_info.php';
     .tab-content.active {
       display: block;
     }
+    .match-cell {
+  padding: 0.5rem;
+  line-height: 1.6;
+}
+
+.team-line {
+  display: block;
+  padding: 4px 0;
+}
+
   </style>
 </head>
 <body>
@@ -81,10 +100,15 @@ require 'includes/category_info.php';
 
   <div class="tab-content <?= $active_tab === 'schedule' ? 'active' : '' ?>" id="schedule">
     <h2>Schedule</h2>
-    <form action="single_elimination.php" method="POST" onsubmit="return confirm('This will generate a full single elimination bracket. Proceed?')">
-  <input type="hidden" name="category_id" value="<?= $category_id ?>">
-  <button type="submit">Generate Single Elimination Schedule</button>
-</form>
+    <?php if (!$scheduleGenerated): ?>
+  <form action="single_elimination.php" method="POST" onsubmit="return confirm('This will generate a full single elimination bracket. Proceed?')">
+    <input type="hidden" name="category_id" value="<?= $category_id ?>">
+    <button type="submit">Generate Single Elimination Schedule</button>
+  </form>
+<?php else: ?>
+  <p><em>Schedule already generated.</em></p>
+<?php endif; ?>
+
 
 <?php
 $schedule = $pdo->prepare("SELECT g.*, t1.team_name AS home_name, t2.team_name AS away_name
@@ -116,11 +140,38 @@ $games = $schedule->fetchAll();
   <td><?= $index + 1 ?></td>
 
         <td>Round <?= $game['round'] ?></td>
-        <td>
-  <?= $game['hometeam_id'] ? '<a href="team_details.php?team_id=' . $game['hometeam_id'] . '">' . htmlspecialchars($game['home_name']) . '</a>' : 'TBD' ?>
-  vs
-  <?= $game['awayteam_id'] ? '<a href="team_details.php?team_id=' . $game['awayteam_id'] . '">' . htmlspecialchars($game['away_name']) . '</a>' : 'TBD' ?>
+       <td class="match-cell">
+  <div class="match-grid">
+    <div class="team-name">
+      <?= $game['hometeam_id'] ? '<a href="team_details.php?team_id=' . $game['hometeam_id'] . '">' . htmlspecialchars($game['home_name']) . '</a>' : 'TBD' ?>
+    </div>
+    <div class="team-result">
+      <?php
+        if ($game['game_status'] === 'final') {
+          echo ($game['winner_team_id'] == $game['hometeam_id']) ? 'W' : 'L';
+        } else {
+          echo '-';
+        }
+      ?>
+    </div>
+
+    <div class="team-name">
+      <?= $game['awayteam_id'] ? '<a href="team_details.php?team_id=' . $game['awayteam_id'] . '">' . htmlspecialchars($game['away_name']) . '</a>' : 'TBD' ?>
+    </div>
+    <div class="team-result">
+      <?php
+        if ($game['game_status'] === 'final') {
+          echo ($game['winner_team_id'] == $game['awayteam_id']) ? 'W' : 'L';
+        } else {
+          echo '-';
+        }
+      ?>
+    </div>
+  </div>
 </td>
+
+
+
 
 
         <td><?= $game['game_status'] ?></td>

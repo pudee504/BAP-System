@@ -60,16 +60,21 @@ while ($current_round_games > 1) {
 }
 
 // Insert games into database
-$insert = $pdo->prepare("INSERT INTO game (category_id, hometeam_id, awayteam_id, round, game_status, cluster_id, game_date) VALUES (?, ?, ?, ?, 'Upcoming', 0, NOW())");
+$stmt = $pdo->prepare("INSERT INTO game (category_id, round, hometeam_id, awayteam_id, game_status, game_date)
+VALUES (?, ?, ?, ?, 'upcoming', NULL)");
+
 
 foreach ($games as $g) {
-  $insert->execute([
+  $stmt->execute([
     $category_id,
+    $g['round'],
     $g['home_id'],
-    $g['away_id'],
-    $g['round']
+    $g['away_id']
   ]);
 }
+
+$pdo->prepare("UPDATE category SET schedule_generated = 1 WHERE id = ?")->execute([$category_id]);
+
 
 header("Location: category_details.php?category_id=$category_id&tab=schedule");
 exit;
