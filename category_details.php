@@ -100,14 +100,31 @@ $active_tab = $_GET['tab'] ?? 'teams';
 
   <div class="tab-content <?= $active_tab === 'schedule' ? 'active' : '' ?>" id="schedule">
     <h2>Schedule</h2>
-    <?php if (!$scheduleGenerated): ?>
-  <form action="single_elimination.php" method="POST" onsubmit="return confirm('This will generate a full single elimination bracket. Proceed?')">
-    <input type="hidden" name="category_id" value="<?= $category_id ?>">
-    <button type="submit">Generate Single Elimination Schedule</button>
-  </form>
-<?php else: ?>
-  <p><em>Schedule already generated.</em></p>
+    <?php if ($category['format_name'] === 'Single Elimination'): ?>
+  <?php if (!$scheduleGenerated): ?>
+    <form action="single_elimination.php" method="POST" onsubmit="return confirm('This will generate a full single elimination bracket. Proceed?')">
+      <input type="hidden" name="category_id" value="<?= $category_id ?>">
+      <button type="submit">Generate Single Elimination Schedule</button>
+    </form>
+  <?php else: ?>
+    <p style="color: green;"><strong>Schedule already generated.</strong></p>
+  <?php endif; ?>
 <?php endif; ?>
+
+
+<?php if ($category['format_name'] === 'Double Elimination'): ?>
+  <?php if (!$scheduleGenerated): ?>
+    <form action="double_elimination.php" method="POST" onsubmit="return confirm('This will generate a full double elimination bracket. Proceed?')">
+      <input type="hidden" name="category_id" value="<?= $category_id ?>">
+      <button type="submit">Generate Double Elimination Schedule</button>
+    </form>
+  <?php else: ?>
+    <p style="color: green;"><strong>Schedule already generated.</strong></p>
+  <?php endif; ?>
+<?php endif; ?>
+
+
+
 
 
 <?php
@@ -169,9 +186,6 @@ $games = $schedule->fetchAll();
     </div>
   </div>
 </td>
-
-
-
 
 
         <td><?= $game['game_status'] ?></td>

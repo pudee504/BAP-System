@@ -9,7 +9,7 @@ if (!$category_id) {
 
 // Fetch category details
 $stmt = $pdo->prepare("
-    SELECT c.category_name, f.format_name, cf.format_id, cf.num_teams, cf.num_groups, cf.advance_per_group, cf.is_locked
+    SELECT c.category_name, f.format_name, cf.format_id, cf.num_teams, cf.num_groups, cf.advance_per_group, cf.is_locked, c.schedule_generated
     FROM category c
     JOIN category_format cf ON c.id = cf.category_id
     JOIN format f ON cf.format_id = f.id

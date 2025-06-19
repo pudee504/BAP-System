@@ -7,6 +7,13 @@ if (!$category_id) {
   die("Missing category_id.");
 }
 
+$check = $pdo->prepare("SELECT schedule_generated FROM category WHERE id = ?");
+$check->execute([$category_id]);
+$already = $check->fetchColumn();
+if ($already) {
+  die("Schedule already generated.");
+}
+
 // Fetch teams sorted by seed
 $stmt = $pdo->prepare("SELECT id, team_name FROM team WHERE category_id = ? ORDER BY seed ASC");
 $stmt->execute([$category_id]);
