@@ -56,7 +56,8 @@ $games = $schedule->fetchAll();
 <tr>
   <td><?= $index + 1 ?></td>
 
-        <td>Round <?= $game['round'] ?></td>
+        <td><?= $game['round_name'] ?: 'Round ' . $game['round'] ?></td>
+
        <td class="match-cell">
   <div class="match-grid">
     <div class="team-name">

@@ -8,77 +8,76 @@ if (!$category_id) {
 
 $check = $pdo->prepare("SELECT schedule_generated FROM category WHERE id = ?");
 $check->execute([$category_id]);
-$already = $check->fetchColumn();
-if ($already) {
+if ($check->fetchColumn()) {
   die("Schedule already generated.");
 }
 
-
-// Fetch teams by seed
 $stmt = $pdo->prepare("SELECT id, team_name FROM team WHERE category_id = ? ORDER BY seed ASC");
 $stmt->execute([$category_id]);
 $teams = $stmt->fetchAll();
 $total_teams = count($teams);
 
-// Must be power of 2: 4, 8, 16...
-if ($total_teams < 2 || ($total_teams & ($total_teams - 1)) !== 0) {
-  die("Team count must be a power of 2 (e.g., 4, 8, 16).");
+if (!in_array($total_teams, [4, 8])) {
+  die("Only 4 or 8 teams supported for this format.");
 }
 
-// Delete existing games
 $pdo->prepare("DELETE FROM game WHERE category_id = ?")->execute([$category_id]);
 
-// Prepare insertion (NO bracket_type column needed if your DB doesn't support it)
-$insert = $pdo->prepare("INSERT INTO game (category_id, round, hometeam_id, awayteam_id, game_status, game_date)
-VALUES (?, ?, ?, ?, 'upcoming', NULL)");
+$insert = $pdo->prepare("INSERT INTO game (category_id, round, round_name, hometeam_id, awayteam_id, game_status, game_date)
+VALUES (?, ?, ?, ?, ?, 'upcoming', NULL)");
 
-// --- 1. Winners Bracket (3 rounds, 7 games total)
 $round = 1;
-$games = [];
-$game_refs = [];
 
-// Round 1 (4 games)
-for ($i = 0; $i < $total_teams / 2; $i++) {
-  $home = $teams[$i];
-  $away = $teams[$total_teams - 1 - $i];
-  $games[] = [$round, $home['id'], $away['id']];
+if ($total_teams == 4) {
+  // --- Upper Bracket ---
+  $insert->execute([$category_id, $round, "Upper Bracket Semifinal", $teams[0]['id'], $teams[3]['id']]);
+  $insert->execute([$category_id, $round, "Upper Bracket Semifinal", $teams[1]['id'], $teams[2]['id']]);
+
+  // UB Final
+  $insert->execute([$category_id, ++$round, "Upper Bracket Final", null, null]);
+
+  // LB Semifinal
+  $insert->execute([$category_id, ++$round, "Lower Bracket Semifinal", null, null]);
+
+  // LB Final
+  $insert->execute([$category_id, ++$round, "Lower Bracket Final", null, null]);
+
+  // Grand Final
+  $insert->execute([$category_id, ++$round, "Grand Final", null, null]);
+
+} elseif ($total_teams == 8) {
+  // --- Upper Bracket Quarterfinals ---
+  $insert->execute([$category_id, $round, "Upper Bracket Quarterfinal", $teams[0]['id'], $teams[7]['id']]);
+  $insert->execute([$category_id, $round, "Upper Bracket Quarterfinal", $teams[1]['id'], $teams[6]['id']]);
+  $insert->execute([$category_id, $round, "Upper Bracket Quarterfinal", $teams[2]['id'], $teams[5]['id']]);
+  $insert->execute([$category_id, $round, "Upper Bracket Quarterfinal", $teams[3]['id'], $teams[4]['id']]);
+
+  // UB Semifinals
+  $insert->execute([$category_id, ++$round, "Upper Bracket Semifinal", null, null]);
+  $insert->execute([$category_id, $round, "Upper Bracket Semifinal", null, null]);
+
+  // UB Final
+  $insert->execute([$category_id, ++$round, "Upper Bracket Final", null, null]);
+
+  // LB Round 1
+  $insert->execute([$category_id, 1, "Lower Bracket Round 1", null, null]);
+  $insert->execute([$category_id, 1, "Lower Bracket Round 1", null, null]);
+
+  // LB Quarterfinals
+  $insert->execute([$category_id, 2, "Lower Bracket Quarterfinal", null, null]);
+  $insert->execute([$category_id, 2, "Lower Bracket Quarterfinal", null, null]);
+
+  // LB Semifinal
+  $insert->execute([$category_id, 3, "Lower Bracket Semifinal", null, null]);
+
+  // LB Final
+  $insert->execute([$category_id, 4, "Lower Bracket Final", null, null]);
+
+  // Grand Final
+  $insert->execute([$category_id, 5, "Grand Final", null, null]);
 }
 
-// Round 2 (2 games)
-$round++;
-$games[] = [$round, null, null];
-$games[] = [$round, null, null];
-
-// Round 3 (1 game)
-$round++;
-$games[] = [$round, null, null];
-
-// --- 2. Losers Bracket (4 rounds, 6 games total)
-$loser_games = [
-  [1, null, null],
-  [1, null, null],
-  [2, null, null],
-  [2, null, null],
-  [3, null, null],
-  [4, null, null],
-];
-
-// --- 3. Grand Final (1 game only)
-$final_round = 5; // assuming highest round of losers is 4
-$games[] = [$final_round, null, null];
-
-// --- 4. Insert into database
-foreach ($games as $g) {
-  $insert->execute([$category_id, $g[0], $g[1], $g[2]]);
-}
-
-foreach ($loser_games as $g) {
-  $insert->execute([$category_id, $g[0], $g[1], $g[2]]);
-}
-
-// --- 5. Mark schedule as generated
 $pdo->prepare("UPDATE category SET schedule_generated = 1 WHERE id = ?")->execute([$category_id]);
 
-// --- 6. Redirect
 header("Location: category_details.php?category_id=$category_id&tab=schedule");
 exit;
