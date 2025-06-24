@@ -23,6 +23,16 @@
   <?php endif; ?>
 <?php endif; ?>
 
+<?php if ($category['format_name'] === 'Round Robin'): ?>
+  <?php if (!$scheduleGenerated): ?>
+    <form action="round_robin.php" method="POST" onsubmit="return confirm('This will generate a full round robin bracket. Proceed?')">
+      <input type="hidden" name="category_id" value="<?= $category_id ?>">
+      <button type="submit">Generate Round Robin Schedule</button>
+    </form>
+  <?php else: ?>
+    <p style="color: green;"><strong>Schedule already generated.</strong></p>
+  <?php endif; ?>
+<?php endif; ?>
 
 
 
