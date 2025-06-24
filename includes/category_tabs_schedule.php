@@ -116,7 +116,16 @@ $games = $schedule->fetchAll();
     <input type="datetime-local" name="game_date" required>
     <button type="submit">Save</button>
   </form>
+  <?php if ($game['game_date'] && $game['game_date'] !== '0000-00-00 00:00'): ?>
+  <form action="start_game.php" method="GET" style="display:inline;">
+    <input type="hidden" name="game_id" value="<?= $game['id'] ?>">
+    <input type="hidden" name="category_id" value="<?= $category_id ?>">
+    <button type="submit">Start Game</button>
+  </form>
+<?php else: ?>
   <button disabled>Start Game</button>
+<?php endif; ?>
+
 </td>
 
 
