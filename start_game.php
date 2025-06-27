@@ -10,6 +10,36 @@ if (!$game_id) {
   die("Invalid game ID.");
 }
 
+// Try to get saved timer from DB
+$stmt = $pdo->prepare("SELECT * FROM game_timer WHERE game_id = ?");
+$stmt->execute([$game_id]);
+$timer = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if ($timer) {
+  $_SESSION['game_timers'][$game_id] = [
+    'game_clock' => (int)$timer['game_clock'],
+    'shot_clock' => (int)$timer['shot_clock'],
+    'quarter_id' => (int)$timer['quarter_id'],
+    'running' => (bool)$timer['running']
+  ];
+} else {
+  $_SESSION['game_timers'][$game_id] = [
+    'game_clock' => 600,
+    'shot_clock' => 24,
+    'quarter_id' => 1, // default to 1st quarter
+    'running' => false
+  ];
+}
+
+
+
+$game_clock = $_SESSION['game_timers'][$game_id]['game_clock'];
+$shot_clock = $_SESSION['game_timers'][$game_id]['shot_clock'];
+$quarter_id = $_SESSION['game_timers'][$game_id]['quarter_id'];
+
+$running = $_SESSION['game_timers'][$game_id]['running'];
+
+
 // Fetch game details
 $stmt = $pdo->prepare("
   SELECT g.*, t1.team_name AS home_team_name, t2.team_name AS away_team_name
@@ -147,6 +177,77 @@ $pdo->prepare("UPDATE game SET game_status = 'Active' WHERE id = ?")->execute([$
   font-size: 32px;
 }
 
+.timer-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  background-color: #f9f9f9;
+  border-bottom: 1px solid #ddd;
+}
+
+.timer-panel .quarter {
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.timer-panel .timers {
+  display: flex;
+  gap: 20px;
+  font-size: 32px;
+  font-weight: bold;
+}
+
+.timer-panel .game-clock,
+.timer-panel .shot-clock {
+  padding: 6px 16px;
+  border: 2px solid #333;
+  border-radius: 6px;
+  background-color: #fff;
+}
+.fixed-header {
+      position: sticky;
+      top: 0;
+      background-color: white;
+      padding: 10px 0;
+      z-index: 1000;
+      border-bottom: 2px solid #ddd;
+    }
+
+.timers {
+  display: flex;
+  gap: 40px;
+  font-size: 32px;
+  font-weight: bold;
+  align-items: center;
+  justify-content: center;
+}
+
+.clock-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.adjust-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.adjust-buttons button {
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  background-color: #f2f2f2;
+  border-radius: 4px;
+}
+
+
   </style>
 </head>
 <body>
@@ -158,6 +259,43 @@ $pdo->prepare("UPDATE game SET game_status = 'Active' WHERE id = ?")->execute([$
   <span class="score" id="scoreB">0</span>
   <span class="team-name"><?php echo htmlspecialchars($game['away_team_name']); ?></span>
 </div>
+
+<div class="timer-panel">
+
+  <div class="quarter" id="quarterLabel">1st Quarter</div>
+  <div class="timers">
+  <div class="clock-control">
+    <div class="game-clock" id="gameClock">10:00</div>
+    <div class="adjust-buttons">
+      <button onclick="adjustGameClock(1)">+</button>
+      <button onclick="adjustGameClock(-1)">−</button>
+    </div>
+  </div>
+
+  <div class="clock-control">
+    <div class="shot-clock" id="shotClock">24</div>
+    <div class="adjust-buttons">
+      <button onclick="adjustShotClock(1)">+</button>
+      <button onclick="adjustShotClock(-1)">−</button>
+    </div>
+  </div>
+</div>
+
+
+
+  </div>
+  <div style="margin-top: 10px;">
+    <button id="toggleClockBtn" onclick="toggleClocks()">Start</button>
+  </div>
+</div>
+
+
+<div style="margin-top:10px; text-align:center;">
+  <button onclick="offensiveRebound()">Offensive Rebound</button>
+  <button onclick="resetShotClock(false)">Change Possession</button>
+  <button onclick="nextQuarter()">Next Quarter</button>
+</div>
+
 
 
 
@@ -432,7 +570,147 @@ function hideButtons(cell) {
 
 renderTeam('teamA');
 renderTeam('teamB');
+
+
 </script>
+<script>
+let gameClock = <?php echo $game_clock; ?>;
+
+let shotClock = <?php echo $shot_clock; ?>;
+let quarter = <?php echo $quarter_id; ?>;
+let clocksRunning = <?php echo json_encode($running); ?>;
+
+let gameClockInterval = null;
+let shotClockInterval = null;
+
+function formatTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function updateClocksUI() {
+  document.getElementById('gameClock').textContent = formatTime(gameClock);
+  document.getElementById('shotClock').textContent = shotClock;
+  document.getElementById('quarterLabel').textContent = quarter <= 4 ? 
+    ['1st', '2nd', '3rd', '4th'][quarter - 1] + ' Quarter' : `Overtime ${quarter - 4}`;
+}
+
+function saveTimerState() {
+  fetch('save_timer_state.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      game_id: gameData.gameId,
+      game_clock: gameClock,
+      shot_clock: shotClock,
+      quarter_id: quarter,
+      running: clocksRunning
+    })
+  });
+}
+
+function startClocks() {
+  if (!gameClockInterval) {
+    gameClockInterval = setInterval(() => {
+      if (gameClock > 0) gameClock--;
+      updateClocksUI();
+      saveTimerState();
+    }, 1000);
+  }
+  if (!shotClockInterval) {
+    shotClockInterval = setInterval(() => {
+      if (shotClock > 0) shotClock--;
+      updateClocksUI();
+      saveTimerState();
+    }, 1000);
+  }
+  clocksRunning = true;
+  document.getElementById('toggleClockBtn').textContent = 'Pause';
+  saveTimerState();
+}
+
+function pauseClocks() {
+  clearInterval(gameClockInterval);
+  clearInterval(shotClockInterval);
+  gameClockInterval = null;
+  shotClockInterval = null;
+  clocksRunning = false;
+  document.getElementById('toggleClockBtn').textContent = 'Start';
+  saveTimerState();
+}
+
+function toggleClocks() {
+  if (clocksRunning) {
+    pauseClocks();
+  } else {
+    startClocks();
+  }
+}
+
+function resetShotClock(isOffensiveRebound = false) {
+  const maxShot = isOffensiveRebound ? 14 : 24;
+  shotClock = Math.min(gameClock, maxShot); // ✅ cap shot clock to remaining game time
+  updateClocksUI();
+  saveTimerState();
+}
+
+
+function offensiveRebound() {
+  resetShotClock(true);
+}
+
+function changePossession(newTeam) {
+  possessionTeam = newTeam;
+  resetShotClock(false);
+}
+
+function nextQuarter() {
+  quarter++;
+  gameClock = quarter <= 4 ? 600 : 300;
+  resetShotClock(false);
+  updateClocksUI();
+  saveTimerState();
+}
+
+// Initial UI update
+window.addEventListener('DOMContentLoaded', () => {
+  updateClocksUI();
+  if (clocksRunning) {
+    startClocks();
+  }
+});
+
+function adjustGameClock(delta) {
+  if (!clocksRunning) {
+    const maxTime = quarter <= 4 ? 600 : 300;
+    gameClock = Math.max(0, Math.min(gameClock + delta, maxTime));
+
+    // Ensure shot clock doesn't exceed game clock
+    if (shotClock > gameClock) {
+      shotClock = gameClock;
+    }
+
+    updateClocksUI();
+    saveTimerState();
+  }
+}
+
+function adjustShotClock(delta) {
+  if (!clocksRunning) {
+    // Don't allow shot clock to go above 24 or game clock
+    shotClock = Math.max(0, Math.min(shotClock + delta, Math.min(24, gameClock)));
+    updateClocksUI();
+    saveTimerState();
+  }
+}
+
+
+
+
+</script>
+
+
 
 </body>
 </html>
