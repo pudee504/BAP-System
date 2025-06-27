@@ -86,7 +86,20 @@ $pdo->prepare("UPDATE game SET game_status = 'Active' WHERE id = ?")->execute([$
     .teams-container { display: flex; justify-content: space-between; gap: 20px; }
     .team-box { width: 49%; border: 1px solid #ccc; border-radius: 8px; padding: 10px; }
     .team-header { font-weight: bold; text-align: center; margin-bottom: 10px; }
-    .score-line { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 5px; }
+    .score-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
+  margin-bottom: 5px;
+}
+
+.score-value {
+  font-size: 24px;
+  font-weight: bold;
+  color: #333;
+}
+
     table { width: 100%; border-collapse: collapse; font-size: 14px; }
     th, td { border: 1px solid #ddd; padding: 4px; text-align: center; position: relative; }
     th { background-color: #f2f2f2; }
@@ -96,49 +109,101 @@ $pdo->prepare("UPDATE game SET game_status = 'Active' WHERE id = ?")->execute([$
     .jersey-input { width: 50px; text-align: center; }
     .in-game-checkbox { cursor: pointer; }
     tr:has(.in-game-checkbox:checked) { background-color: #e0ffe0; }
+    .shared-score {
+  text-align: center;
+  font-size: 32px;
+  font-weight: bold;
+  margin-bottom: 30px;
+}
+
+.score-display {
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  background: white;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #ccc;
+  font-size: 24px;
+  font-weight: bold;
+  text-align: center;
+}
+
+.score-display .team-name {
+  flex: 1 1 auto;
+  max-width: 150px;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+.score-display .score,
+.score-display .separator {
+  min-width: 30px;
+  flex-shrink: 0;
+  font-size: 32px;
+}
+
   </style>
 </head>
 <body>
 
-<h1>Game Statistics - <?php echo htmlspecialchars($game['home_team_name']); ?> vs <?php echo htmlspecialchars($game['away_team_name']); ?></h1>
+<div class="score-display">
+  <span class="team-name"><?php echo htmlspecialchars($game['home_team_name']); ?></span>
+  <span class="score" id="scoreA">0</span>
+  <span class="separator">—</span>
+  <span class="score" id="scoreB">0</span>
+  <span class="team-name"><?php echo htmlspecialchars($game['away_team_name']); ?></span>
+</div>
+
+
+
+
 <div class="teams-container">
   <div class="team-box" id="teamA">
-    <div class="team-header"><?php echo htmlspecialchars($game['home_team_name']); ?></div>
+    
+
     <div class="score-line">
-      <span>Running Score: <span id="scoreA">0</span></span>
-      <span>Team Fouls: <span id="foulsA">0</span></span>
-      <span>Timeouts: <span id="timeoutsA">0</span></span>
-    </div>
+  <span>Timeouts: <span id="timeoutsA">0</span></span>
+  <span>Team Fouls: <span id="foulsA">0</span></span>
+</div>
+
+
     <table>
       <thead>
         <tr>
           <th style="width: 30px;">In</th>
           <th style="width: 50px;">#</th>
           <th>Name</th>
-          <th>1PM</th><th>2PM</th><th>3PM</th>
-          <th>REB</th><th>AST</th><th>BLK</th><th>STL</th><th>TO</th>
-          <th>PTS</th>
+          <th>1PM</th><th>2PM</th><th>3PM</th><th>FOUL</th>
+<th>REB</th><th>AST</th><th>BLK</th><th>STL</th><th>TO</th><th>PTS</th>
+
+
         </tr>
       </thead>
       <tbody id="teamA-players"></tbody>
     </table>
   </div>
   <div class="team-box" id="teamB">
-    <div class="team-header"><?php echo htmlspecialchars($game['away_team_name']); ?></div>
-    <div class="score-line">
-      <span>Running Score: <span id="scoreB">0</span></span>
-      <span>Team Fouls: <span id="foulsB">0</span></span>
-      <span>Timeouts: <span id="timeoutsB">0</span></span>
-    </div>
+    
+   <div class="score-line">
+  <span>Timeouts: <span id="timeoutsB">0</span></span>
+  <span>Team Fouls: <span id="foulsB">0</span></span>
+</div>
+
+
     <table>
       <thead>
         <tr>
           <th style="width: 30px;">In</th>
           <th style="width: 50px;">#</th>
           <th>Name</th>
-          <th>1PM</th><th>2PM</th><th>3PM</th>
-          <th>REB</th><th>AST</th><th>BLK</th><th>STL</th><th>TO</th>
-          <th>PTS</th>
+          <th>1PM</th><th>2PM</th><th>3PM</th><th>FOUL</th>
+<th>REB</th><th>AST</th><th>BLK</th><th>STL</th><th>TO</th><th>PTS</th>
+
         </tr>
       </thead>
       <tbody id="teamB-players"></tbody>
@@ -178,7 +243,9 @@ const playerStats = {
       'AST': Number(p['AST']) || 0,
       'BLK': Number(p['BLK']) || 0,
       'STL': Number(p['STL']) || 0,
-      'TO': Number(p['TO']) || 0
+      'TO': Number(p['TO']) || 0,
+      'FOUL': Number(p['FOUL']) || 0
+
     }
   })),
   teamB: gameData.teamB.players.map(p => ({
@@ -195,7 +262,9 @@ const playerStats = {
       'AST': Number(p['AST']) || 0,
       'BLK': Number(p['BLK']) || 0,
       'STL': Number(p['STL']) || 0,
-      'TO': Number(p['TO']) || 0
+      'TO': Number(p['TO']) || 0,
+      'FOUL': Number(p['FOUL']) || 0
+      
     }
   }))
 };
@@ -213,7 +282,7 @@ function calculatePoints(stats) {
 function updateRunningScore(teamId) {
   const players = playerStats[teamId];
   const total = players.reduce((sum, p) => sum + calculatePoints(p.stats), 0);
-  document.getElementById(`score${teamId.charAt(4).toUpperCase()}`).textContent = total;
+  document.getElementById(teamId === 'teamA' ? 'scoreA' : 'scoreB').textContent = total;
 }
 
 function renderTeam(teamId) {
@@ -229,7 +298,7 @@ function renderTeam(teamId) {
       <td><input type="checkbox" class="in-game-checkbox" ${player.isPlaying ? 'checked' : ''} onchange="togglePlayer('${teamId}', ${idx}, this.checked)"></td>
       <td><input type="text" class="jersey-input" value="${player.jersey}" onchange="updateJersey('${teamId}', ${idx}, this.value)"></td>
       <td>${player.name}</td>
-      ${['1PM','2PM','3PM','REB','AST','BLK','STL','TO'].map(stat => `
+      ${['1PM','2PM','3PM','FOUL','REB','AST','BLK','STL','TO'].map(stat => `
         <td class="stat-cell" onmouseover="showButtons(this)" onmouseleave="hideButtons(this)">
           ${stats[stat]}<span class="stat-controls">
             <button onclick="updateStat('${teamId}', ${idx}, '${stat}', 1)">+</button>
