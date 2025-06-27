@@ -6,6 +6,7 @@ require_once 'db.php';
 
 $game_id = $_GET['game_id'] ?? '';
 if (!$game_id) {
+  error_log("No game_id provided in start_game.php");
   die("Invalid game ID.");
 }
 
@@ -21,13 +22,15 @@ $stmt->execute([$game_id]);
 $game = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$game) {
-  die("Game ID $game_id not found.");
+  error_log("Game ID $game_id not found in start_game.php");
+  die("Game not found.");
 }
 if (!array_key_exists('hometeam_id', $game) || !$game['hometeam_id'] || !array_key_exists('awayteam_id', $game) || !$game['awayteam_id']) {
-  die("Invalid game: teams not assigned. Game data: " . var_export($game, true));
+  error_log("Invalid game teams in start_game.php: " . var_export($game, true));
+  die("Invalid game: teams not assigned.");
 }
 
-// Populate player_game with display_order
+// Populate player_game
 $stmt = $pdo->prepare("
   INSERT IGNORE INTO player_game (player_id, game_id, team_id, jersey_number, is_playing, display_order)
   SELECT pt.player_id, ?, pt.team_id, NULL, 0, pt.player_id
@@ -36,19 +39,35 @@ $stmt = $pdo->prepare("
 ");
 $stmt->execute([$game_id, $game['hometeam_id'], $game['awayteam_id']]);
 
-// Fetch players for home team
+// Fetch players and stats
 $stmt = $pdo->prepare("
-  SELECT p.id, p.first_name, p.last_name, pg.jersey_number, pg.is_playing, pg.display_order
+  SELECT 
+    p.id, 
+    p.first_name, 
+    p.last_name, 
+    pg.jersey_number, 
+    pg.is_playing, 
+    pg.display_order,
+    COALESCE(SUM(CASE WHEN s.statistic_name = '1PM' THEN gs.value ELSE 0 END), 0) AS '1PM',
+    COALESCE(SUM(CASE WHEN s.statistic_name = '2PM' THEN gs.value ELSE 0 END), 0) AS '2PM',
+    COALESCE(SUM(CASE WHEN s.statistic_name = '3PM' THEN gs.value ELSE 0 END), 0) AS '3PM',
+    COALESCE(SUM(CASE WHEN s.statistic_name = 'REB' THEN gs.value ELSE 0 END), 0) AS 'REB',
+    COALESCE(SUM(CASE WHEN s.statistic_name = 'AST' THEN gs.value ELSE 0 END), 0) AS 'AST',
+    COALESCE(SUM(CASE WHEN s.statistic_name = 'BLK' THEN gs.value ELSE 0 END), 0) AS 'BLK',
+    COALESCE(SUM(CASE WHEN s.statistic_name = 'STL' THEN gs.value ELSE 0 END), 0) AS 'STL',
+    COALESCE(SUM(CASE WHEN s.statistic_name = 'TO' THEN gs.value ELSE 0 END), 0) AS 'TO'
   FROM player p
   JOIN player_team pt ON p.id = pt.player_id
   LEFT JOIN player_game pg ON p.id = pg.player_id AND pg.game_id = ? AND pg.team_id = ?
+  LEFT JOIN game_statistic gs ON pg.player_id = gs.player_id AND pg.game_id = gs.game_id AND pg.team_id = gs.team_id
+  LEFT JOIN statistic s ON gs.statistic_id = s.id
   WHERE pt.team_id = ?
+  GROUP BY p.id, p.first_name, p.last_name, pg.jersey_number, pg.is_playing, pg.display_order
   ORDER BY pg.display_order ASC
 ");
 $stmt->execute([$game_id, $game['hometeam_id'], $game['hometeam_id']]);
 $home_players = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Fetch players for away team
 $stmt->execute([$game_id, $game['awayteam_id'], $game['awayteam_id']]);
 $away_players = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -151,7 +170,16 @@ const playerStats = {
     name: `${p.first_name} ${p.last_name}`,
     isPlaying: p.is_playing ?? 0,
     displayOrder: p.display_order ?? 999999,
-    stats: { '1PM': 0, '2PM': 0, '3PM': 0, REB: 0, AST: 0, BLK: 0, STL: 0, TO: 0 }
+    stats: {
+      '1PM': Number(p['1PM']) || 0,
+      '2PM': Number(p['2PM']) || 0,
+      '3PM': Number(p['3PM']) || 0,
+      'REB': Number(p['REB']) || 0,
+      'AST': Number(p['AST']) || 0,
+      'BLK': Number(p['BLK']) || 0,
+      'STL': Number(p['STL']) || 0,
+      'TO': Number(p['TO']) || 0
+    }
   })),
   teamB: gameData.teamB.players.map(p => ({
     id: p.id,
@@ -159,7 +187,16 @@ const playerStats = {
     name: `${p.first_name} ${p.last_name}`,
     isPlaying: p.is_playing ?? 0,
     displayOrder: p.display_order ?? 999999,
-    stats: { '1PM': 0, '2PM': 0, '3PM': 0, REB: 0, AST: 0, BLK: 0, STL: 0, TO: 0 }
+    stats: {
+      '1PM': Number(p['1PM']) || 0,
+      '2PM': Number(p['2PM']) || 0,
+      '3PM': Number(p['3PM']) || 0,
+      'REB': Number(p['REB']) || 0,
+      'AST': Number(p['AST']) || 0,
+      'BLK': Number(p['BLK']) || 0,
+      'STL': Number(p['STL']) || 0,
+      'TO': Number(p['TO']) || 0
+    }
   }))
 };
 
@@ -167,12 +204,6 @@ const playerStats = {
 const inGameCounts = {
   teamA: playerStats.teamA.filter(p => p.isPlaying).length,
   teamB: playerStats.teamB.filter(p => p.isPlaying).length
-};
-
-// Track recently unchecked players
-const uncheckedQueue = {
-  teamA: [],
-  teamB: []
 };
 
 function calculatePoints(stats) {
@@ -211,17 +242,17 @@ function renderTeam(teamId) {
   });
 
   updateRunningScore(teamId);
-  console.log(`Rendered ${teamId}:`, playerStats[teamId].map(p => ({ name: p.name, isPlaying: p.isPlaying, displayOrder: p.displayOrder })), `Unchecked Queue:`, uncheckedQueue[teamId]);
+  console.log(`Rendered ${teamId}:`, playerStats[teamId].map(p => ({ name: p.name, isPlaying: p.isPlaying, displayOrder: p.displayOrder, stats: p.stats })));
 }
 
 function updatePlayerOrder(teamId) {
   const players = playerStats[teamId];
-  // Update displayOrder in playerStats
   players.forEach((player, idx) => {
     player.displayOrder = idx;
   });
 
-  // Send order to server
+  console.log(`Updating order for ${teamId}:`, players.map(p => ({ id: p.id, name: p.name, displayOrder: p.displayOrder })));
+
   fetch('update_player_order.php', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -230,50 +261,45 @@ function updatePlayerOrder(teamId) {
       team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id,
       order: players.map(p => p.id)
     })
-  }).catch(error => console.error('Error updating player order:', error));
+  }).then(response => response.json()).then(data => {
+    if (!data.success) {
+      console.error(`Failed to update order for ${teamId}:`, data.error);
+    } else {
+      console.log(`Order updated successfully for ${teamId}`);
+    }
+  }).catch(error => console.error(`Error updating order for ${teamId}:`, error));
 }
 
 function togglePlayer(teamId, playerIdx, isChecked) {
-  const player = playerStats[teamId][playerIdx];
   const players = playerStats[teamId];
-  const currentCount = inGameCounts[teamId];
+  const player = players[playerIdx];
+
+  const inGamePlayers = players.filter(p => p.isPlaying);
+  const totalInGame = inGamePlayers.length;
 
   if (isChecked) {
-    if (currentCount >= 5) {
-      alert(`Cannot have more than 5 players in the game for ${gameData[teamId].name}!`);
+    if (totalInGame >= 5) {
+      // Prevent selecting more than 5
       document.querySelector(`#${teamId}-players tr:nth-child(${playerIdx + 1}) .in-game-checkbox`).checked = false;
+      alert(`Only 5 players can be in the game for ${gameData[teamId].name}.`);
       return;
     }
 
-    // Update state
     player.isPlaying = 1;
-    inGameCounts[teamId]++;
-
-    // Move checked player to bottom of in-game players (or top if <5 in-game)
-    if (playerIdx >= 5) { // Only move if not already in top 5
-      const [movedPlayer] = players.splice(playerIdx, 1);
-      const inGameCount = players.filter(p => p.isPlaying).length;
-      const insertIdx = Math.min(inGameCount - 1, 4); // Insert after last in-game player, max index 4
-      players.splice(insertIdx, 0, movedPlayer);
-    }
-
-    // If there are unchecked players in the queue, move the oldest to the bottom
-    if (uncheckedQueue[teamId].length > 0) {
-      const uncheckedPlayerId = uncheckedQueue[teamId].shift();
-      const uncheckedIdx = players.findIndex(p => p.id === uncheckedPlayerId);
-      if (uncheckedIdx >= 0 && uncheckedIdx < 5) { // Only move if in top 5
-        const [movedUnchecked] = players.splice(uncheckedIdx, 1);
-        players.push(movedUnchecked);
-      }
-    }
   } else {
-    // Add to unchecked queue instead of moving immediately
     player.isPlaying = 0;
-    inGameCounts[teamId]--;
-    uncheckedQueue[teamId].push(player.id);
   }
 
-  // Send is_playing update to server
+  // Re-sort: all checked (in-game) players go to the top
+  const reordered = [
+    ...players.filter(p => p.isPlaying),
+    ...players.filter(p => !p.isPlaying)
+  ];
+
+  // Rebuild player list
+  playerStats[teamId] = reordered;
+
+  // Update DB
   fetch('update_player_status.php', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -283,32 +309,18 @@ function togglePlayer(teamId, playerIdx, isChecked) {
       team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id,
       is_playing: player.isPlaying
     })
-  }).catch(error => console.error('Error updating player status:', error));
+  }).then(response => response.json()).then(data => {
+    if (!data.success) {
+      console.error(`Failed to update status for ${player.name}:`, data.error);
+    }
+  }).catch(error => console.error(`Error updating status for ${player.name}:`, error));
 
-  // Update player order
   updatePlayerOrder(teamId);
-
-  console.log(`Toggle ${teamId}:`, { player: player.name, isChecked, playerIdx, inGameCount: inGameCounts[teamId], uncheckedQueue: uncheckedQueue[teamId] });
   renderTeam(teamId);
 }
 
-function updateJersey(teamId, playerIdx, jersey) {
-  const player = playerStats[teamId][playerIdx];
-  player.jersey = jersey || '--';
 
-  fetch('update_player_status.php', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      game_id: gameData.gameId,
-      player_id: player.id,
-      team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id,
-      jersey_number: jersey || null
-    })
-  }).catch(error => console.error('Error updating jersey number:', error));
 
-  renderTeam(teamId);
-}
 
 function updateStat(teamId, playerIdx, stat, delta) {
   const player = playerStats[teamId][playerIdx];
@@ -316,7 +328,7 @@ function updateStat(teamId, playerIdx, stat, delta) {
   const confirmMsg = `${action} ${stat} ${delta > 0 ? 'to' : 'from'} ${player.name}?`;
   
   if (!window.confirm(confirmMsg)) {
-    return; // Cancel if user doesn't confirm
+    return;
   }
 
   player.stats[stat] = Math.max(0, player.stats[stat] + delta);
@@ -331,7 +343,11 @@ function updateStat(teamId, playerIdx, stat, delta) {
       statistic_name: stat,
       value: delta
     })
-  }).catch(error => console.error('Error updating stat:', error));
+  }).then(response => response.json()).then(data => {
+    if (!data.success) {
+      console.error(`Failed to update stat for ${player.name}:`, data.error);
+    }
+  }).catch(error => console.error(`Error updating stat for ${player.name}:`, error));
 
   renderTeam(teamId);
 }
