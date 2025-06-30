@@ -9,6 +9,31 @@ if (!$game_id) {
   error_log("No game_id provided in start_game.php");
   die("Invalid game ID.");
 }
+// After fetching game data
+$stmt = $pdo->prepare("SELECT * FROM game_settings WHERE game_id = ?");
+$stmt->execute([$game_id]);
+$settings = $stmt->fetch(PDO::FETCH_ASSOC);
+
+$quarter_id = $_SESSION['game_timers'][$game_id]['quarter_id'];
+$quarter_duration_map = [
+  1 => $settings['q1_duration'] ?? 600,
+  2 => $settings['q2_duration'] ?? 600,
+  3 => $settings['q3_duration'] ?? 600,
+  4 => $settings['q4_duration'] ?? 600
+];
+$current_duration = $quarter_duration_map[$quarter_id] ?? 300; // Default OT = 5min
+$max_team_fouls = $settings['max_team_fouls_per_qtr'] ?? 4;
+$timeouts_per_half = $settings['timeouts_per_half'] ?? 2;
+
+$_SESSION['game_timers'][$game_id] = [
+  'game_clock' => $current_duration,
+  'shot_clock' => 24,
+  'quarter_id' => 1,
+  'running' => false
+];
+
+
+
 
 // Try to get saved timer from DB
 $stmt = $pdo->prepare("SELECT * FROM game_timer WHERE game_id = ?");
@@ -24,7 +49,7 @@ if ($timer) {
   ];
 } else {
   $_SESSION['game_timers'][$game_id] = [
-    'game_clock' => 600,
+    'game_clock' => $quarter_duration,
     'shot_clock' => 24,
     'quarter_id' => 1, // default to 1st quarter
     'running' => false
@@ -79,13 +104,15 @@ $stmt = $pdo->prepare("
     pg.is_playing, 
     pg.display_order,
     COALESCE(SUM(CASE WHEN s.statistic_name = '1PM' THEN gs.value ELSE 0 END), 0) AS '1PM',
-    COALESCE(SUM(CASE WHEN s.statistic_name = '2PM' THEN gs.value ELSE 0 END), 0) AS '2PM',
-    COALESCE(SUM(CASE WHEN s.statistic_name = '3PM' THEN gs.value ELSE 0 END), 0) AS '3PM',
-    COALESCE(SUM(CASE WHEN s.statistic_name = 'REB' THEN gs.value ELSE 0 END), 0) AS 'REB',
-    COALESCE(SUM(CASE WHEN s.statistic_name = 'AST' THEN gs.value ELSE 0 END), 0) AS 'AST',
-    COALESCE(SUM(CASE WHEN s.statistic_name = 'BLK' THEN gs.value ELSE 0 END), 0) AS 'BLK',
-    COALESCE(SUM(CASE WHEN s.statistic_name = 'STL' THEN gs.value ELSE 0 END), 0) AS 'STL',
-    COALESCE(SUM(CASE WHEN s.statistic_name = 'TO' THEN gs.value ELSE 0 END), 0) AS 'TO'
+COALESCE(SUM(CASE WHEN s.statistic_name = '2PM' THEN gs.value ELSE 0 END), 0) AS '2PM',
+COALESCE(SUM(CASE WHEN s.statistic_name = '3PM' THEN gs.value ELSE 0 END), 0) AS '3PM',
+COALESCE(SUM(CASE WHEN s.statistic_name = 'FOUL' THEN gs.value ELSE 0 END), 0) AS 'FOUL',
+COALESCE(SUM(CASE WHEN s.statistic_name = 'REB' THEN gs.value ELSE 0 END), 0) AS 'REB',
+COALESCE(SUM(CASE WHEN s.statistic_name = 'AST' THEN gs.value ELSE 0 END), 0) AS 'AST',
+COALESCE(SUM(CASE WHEN s.statistic_name = 'BLK' THEN gs.value ELSE 0 END), 0) AS 'BLK',
+COALESCE(SUM(CASE WHEN s.statistic_name = 'STL' THEN gs.value ELSE 0 END), 0) AS 'STL',
+COALESCE(SUM(CASE WHEN s.statistic_name = 'TO' THEN gs.value ELSE 0 END), 0) AS 'TO'
+
   FROM player p
   JOIN player_team pt ON p.id = pt.player_id
   LEFT JOIN player_game pg ON p.id = pg.player_id AND pg.game_id = ? AND pg.team_id = ?
@@ -246,9 +273,24 @@ $pdo->prepare("UPDATE game SET game_status = 'Active' WHERE id = ?")->execute([$
   background-color: #f2f2f2;
   border-radius: 4px;
 }
+.settings-link {
+  display: inline-block;
+  margin: 20px auto;
+  font-size: 14px;
+  background-color: #007bff;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  text-decoration: none;
+  text-align: center;
+}
+.settings-link:hover {
+  background-color: #0056b3;
+}
 
 
   </style>
+  
 </head>
 <body>
 
@@ -284,7 +326,7 @@ $pdo->prepare("UPDATE game SET game_status = 'Active' WHERE id = ?")->execute([$
 
 
   </div>
-  <div style="margin-top: 10px;">
+  <div style="margin-top: 10px;text-align:center;">
     <button id="toggleClockBtn" onclick="toggleClocks()">Start</button>
   </div>
 </div>
@@ -348,6 +390,13 @@ $pdo->prepare("UPDATE game SET game_status = 'Active' WHERE id = ?")->execute([$
     </table>
   </div>
 </div>
+
+</div> <!-- teams-container -->
+
+<div style="text-align:center; margin-top: 20px;">
+  <a class="settings-link" href="game_settings.php?game_id=<?php echo urlencode($game_id); ?>">⚙ Game Settings</a>
+</div>
+
 
 <script>
 const gameData = {
@@ -713,4 +762,4 @@ function adjustShotClock(delta) {
 
 
 </body>
-</html>
+</html> 

@@ -1,40 +1,37 @@
 <?php
-header('Content-Type: application/json');
 require_once 'db.php';
 
 $data = json_decode(file_get_contents('php://input'), true);
-if (!$data || !isset($data['game_id'], $data['player_id'], $data['team_id'], $data['statistic_name'], $data['value'])) {
-  http_response_code(400);
-  error_log("Invalid input in update_stat.php: " . json_encode($data));
-  echo json_encode(['error' => 'Invalid input']);
-  exit;
+
+$game_id = $data['game_id'] ?? null;
+$player_id = $data['player_id'] ?? null;
+$team_id = $data['team_id'] ?? null;
+$stat_name = $data['statistic_name'] ?? null;
+$value = isset($data['value']) ? (int)$data['value'] : 0;
+
+if (!$game_id || !$player_id || !$team_id || !$stat_name || !$value) {
+    echo json_encode(['success' => false, 'error' => 'Missing data']);
+    exit;
 }
 
-try {
-  $pdo->beginTransaction();
-  $stmt = $pdo->prepare("
-    INSERT INTO game_stat (game_id, player_id, team_id, statistic_id, quarter_id, value)
-    SELECT ?, ?, ?, s.id, q.id, ?
-    FROM statistic s, quarter q
-    WHERE s.statistic_name = ? AND q.quarter_name = 'Q1'
-    ON DUPLICATE KEY UPDATE value = value + ?
-  ");
-  $stmt->execute([
-    $data['game_id'],
-    $data['player_id'],
-    $data['team_id'],
-    $data['value'],
-    $data['statistic_name'],
-    $data['value']
-  ]);
-  $pdo->commit();
-  echo json_encode(['success' => true]);
-} catch (Exception $e) {
-  $pdo->rollBack();
-  error_log("Error in update_stat.php: " . $e->getMessage());
-  http_response_code(500);
-  echo json_encode(['error' => 'Failed to update stat']);
+// Get statistic_id from statistic_name
+$stmt = $pdo->prepare("SELECT id FROM statistic WHERE statistic_name = ?");
+$stmt->execute([$stat_name]);
+$stat = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$stat) {
+    echo json_encode(['success' => false, 'error' => 'Invalid stat name']);
+    exit;
 }
 
-exit;
-?>
+$statistic_id = $stat['id'];
+
+// Insert or update
+$stmt = $pdo->prepare("
+    INSERT INTO game_statistic (game_id, player_id, team_id, statistic_id, value)
+    VALUES (?, ?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE value = value + VALUES(value)
+");
+$stmt->execute([$game_id, $player_id, $team_id, $statistic_id, $value]);
+
+echo json_encode(['success' => true]);
