@@ -14,31 +14,16 @@ $stmt = $pdo->prepare("SELECT * FROM game_settings WHERE game_id = ?");
 $stmt->execute([$game_id]);
 $settings = $stmt->fetch(PDO::FETCH_ASSOC);
 
-$quarter_id = $_SESSION['game_timers'][$game_id]['quarter_id'];
-$quarter_duration_map = [
-  1 => $settings['q1_duration'] ?? 600,
-  2 => $settings['q2_duration'] ?? 600,
-  3 => $settings['q3_duration'] ?? 600,
-  4 => $settings['q4_duration'] ?? 600
-];
-$current_duration = $quarter_duration_map[$quarter_id] ?? 300; // Default OT = 5min
 $max_team_fouls = $settings['max_team_fouls_per_qtr'] ?? 4;
 $timeouts_per_half = $settings['timeouts_per_half'] ?? 2;
-
-$_SESSION['game_timers'][$game_id] = [
-  'game_clock' => $current_duration,
-  'shot_clock' => 24,
-  'quarter_id' => 1,
-  'running' => false
-];
-
-
 
 
 // Try to get saved timer from DB
 $stmt = $pdo->prepare("SELECT * FROM game_timer WHERE game_id = ?");
 $stmt->execute([$game_id]);
 $timer = $stmt->fetch(PDO::FETCH_ASSOC);
+
+
 
 if ($timer) {
   $_SESSION['game_timers'][$game_id] = [
@@ -49,20 +34,27 @@ if ($timer) {
   ];
 } else {
   $_SESSION['game_timers'][$game_id] = [
-    'game_clock' => $quarter_duration,
+    'game_clock' => 600,
     'shot_clock' => 24,
     'quarter_id' => 1, // default to 1st quarter
     'running' => false
   ];
 }
 
-
+$quarter_id = $_SESSION['game_timers'][$game_id]['quarter_id'];
 
 $game_clock = $_SESSION['game_timers'][$game_id]['game_clock'];
 $shot_clock = $_SESSION['game_timers'][$game_id]['shot_clock'];
-$quarter_id = $_SESSION['game_timers'][$game_id]['quarter_id'];
 
 $running = $_SESSION['game_timers'][$game_id]['running'];
+
+$quarter_duration_map = [
+  1 => $settings['q1_duration'] ?? 600,
+  2 => $settings['q2_duration'] ?? 600,
+  3 => $settings['q3_duration'] ?? 600,
+  4 => $settings['q4_duration'] ?? 600
+];
+$current_duration = $quarter_duration_map[$quarter_id] ?? 300; // Default OT = 5min
 
 
 // Fetch game details
@@ -142,23 +134,45 @@ function getInitialTimeouts($half, $overtimeCount = 0) {
 }
 
 function loadTimeouts($pdo, $game_id, $team_id, $half, $overtimeCount) {
-  $stmt = $pdo->prepare("SELECT remaining_timeouts FROM game_timeouts WHERE game_id = ? AND team_id = ? AND half = ?");
-  $stmt->execute([$game_id, $team_id, $half]);
-  $row = $stmt->fetch(PDO::FETCH_ASSOC);
-  if ($row) return $row['remaining_timeouts'];
-
-  // If no record, insert initial value
+  // Always RESET timeouts at the start of each half or OT
   $initial = getInitialTimeouts($half, $overtimeCount);
-  $insert = $pdo->prepare("INSERT INTO game_timeouts (game_id, team_id, half, remaining_timeouts) VALUES (?, ?, ?, ?)");
-  $insert->execute([$game_id, $team_id, $half, $initial]);
+
+  // Overwrite or Insert timeout record (UPSERT logic)
+  $stmt = $pdo->prepare("
+    INSERT INTO game_timeouts (game_id, team_id, half, remaining_timeouts)
+    VALUES (?, ?, ?, ?)
+    ON DUPLICATE KEY UPDATE remaining_timeouts = VALUES(remaining_timeouts)
+  ");
+  $stmt->execute([$game_id, $team_id, $half, $initial]);
+
   return $initial;
 }
+
 
 $current_half = getCurrentHalf($quarter_id);
 $overtime_count = max(0, $quarter_id - 4);
 
-$timeoutsA = loadTimeouts($pdo, $game_id, $game['hometeam_id'], $current_half, $overtime_count);
-$timeoutsB = loadTimeouts($pdo, $game_id, $game['awayteam_id'], $current_half, $overtime_count);
+function safeLoadTimeouts($pdo, $game_id, $team_id, $half) {
+  $stmt = $pdo->prepare("SELECT remaining_timeouts FROM game_timeouts WHERE game_id = ? AND team_id = ? AND half = ?");
+  $stmt->execute([$game_id, $team_id, $half]);
+  $row = $stmt->fetch(PDO::FETCH_ASSOC);
+  return $row ? (int)$row['remaining_timeouts'] : null;
+}
+
+$timeoutsA = safeLoadTimeouts($pdo, $game_id, $game['hometeam_id'], $current_half);
+if ($timeoutsA === null) {
+  $timeoutsA = getInitialTimeouts($current_half, $overtime_count);
+  $insert = $pdo->prepare("INSERT INTO game_timeouts (game_id, team_id, half, remaining_timeouts) VALUES (?, ?, ?, ?)");
+  $insert->execute([$game_id, $game['hometeam_id'], $current_half, $timeoutsA]);
+}
+
+$timeoutsB = safeLoadTimeouts($pdo, $game_id, $game['awayteam_id'], $current_half);
+if ($timeoutsB === null) {
+  $timeoutsB = getInitialTimeouts($current_half, $overtime_count);
+  $insert = $pdo->prepare("INSERT INTO game_timeouts (game_id, team_id, half, remaining_timeouts) VALUES (?, ?, ?, ?)");
+  $insert->execute([$game_id, $game['awayteam_id'], $current_half, $timeoutsB]);
+}
+
 
 
 ?>
@@ -357,12 +371,17 @@ $timeoutsB = loadTimeouts($pdo, $game_id, $game['awayteam_id'], $current_half, $
   <div class="quarter" id="quarterLabel">1st Quarter</div>
   <div class="timers">
   <div class="clock-control">
-    <div class="game-clock" id="gameClock">10:00</div>
-    <div class="adjust-buttons">
-      <button onclick="adjustGameClock(1)">+</button>
-      <button onclick="adjustGameClock(-1)">−</button>
-    </div>
+  <div class="adjust-buttons">
+    <button onclick="adjustGameClockMinute(1)">+</button>
+    <button onclick="adjustGameClockMinute(-1)">−</button>
   </div>
+  <div class="game-clock" id="gameClock">10:00</div>
+  <div class="adjust-buttons">
+    <button onclick="adjustGameClock(1)">+</button>
+    <button onclick="adjustGameClock(-1)">−</button>
+  </div>
+</div>
+
 
   <div class="clock-control">
     <div class="shot-clock" id="shotClock">24</div>
@@ -383,9 +402,10 @@ $timeoutsB = loadTimeouts($pdo, $game_id, $game['awayteam_id'], $current_half, $
 
 
 <div style="margin-top:10px; text-align:center;">
-  <button onclick="offensiveRebound()">Offensive Rebound</button>
+  <button onclick="offensiveRebound()">Same Possesion</button>
   <button onclick="resetShotClock(false)">Change Possession</button>
-  <button onclick="nextQuarter()">Next Quarter</button>
+  <button id="nextQuarterBtn" onclick="nextQuarter()" disabled>Next Quarter</button>
+
 </div>
 
 
@@ -398,8 +418,11 @@ $timeoutsB = loadTimeouts($pdo, $game_id, $game['awayteam_id'], $current_half, $
 
     <div class="score-line">
   <span>Timeouts: 
-  <button id="timeoutsA" class="timeout-click" data-team="A"><?php echo $timeoutsA; ?></button>
+  <button id="timeoutsA" class="timeout-click" data-team="A" <?php if ($timeoutsA <= 0) echo 'disabled'; ?>>
+    <?php echo $timeoutsA; ?>
+  </button>
 </span>
+
 
 
   <span>Team Fouls: <span id="foulsA">0</span></span>
@@ -425,8 +448,11 @@ $timeoutsB = loadTimeouts($pdo, $game_id, $game['awayteam_id'], $current_half, $
     
    <div class="score-line">
   <span>Timeouts: 
-  <button id="timeoutsB" class="timeout-click" data-team="B"><?php echo $timeoutsB; ?></button>
+  <button id="timeoutsB" class="timeout-click" data-team="B" <?php if ($timeoutsB <= 0) echo 'disabled'; ?>>
+    <?php echo $timeoutsB; ?>
+  </button>
 </span>
+
 
 
   <span>Team Fouls: <span id="foulsB">0</span></span>
@@ -688,17 +714,26 @@ let gameClockInterval = null;
 let shotClockInterval = null;
 
 function formatTime(sec) {
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
+  let m = Math.floor(sec / 60);
+  let s = sec % 60;
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
+
+
 
 function updateClocksUI() {
   document.getElementById('gameClock').textContent = formatTime(gameClock);
   document.getElementById('shotClock').textContent = shotClock;
   document.getElementById('quarterLabel').textContent = quarter <= 4 ? 
     ['1st', '2nd', '3rd', '4th'][quarter - 1] + ' Quarter' : `Overtime ${quarter - 4}`;
+
+  // Enable next quarter only when game clock is 0
+  const nextBtn = document.getElementById('nextQuarterBtn');
+  if (nextBtn) {
+    nextBtn.disabled = gameClock !== 0;
+  }
 }
+
 
 function saveTimerState() {
   fetch('save_timer_state.php', {
@@ -717,7 +752,12 @@ function saveTimerState() {
 function startClocks() {
   if (!gameClockInterval) {
     gameClockInterval = setInterval(() => {
-      if (gameClock > 0) gameClock--;
+      if (gameClock > 0) {
+  gameClock--;
+} else {
+  gameClock = 0;
+}
+
       updateClocksUI();
       saveTimerState();
     }, 1000);
@@ -775,7 +815,35 @@ function nextQuarter() {
   resetShotClock(false);
   updateClocksUI();
   saveTimerState();
+
+  // Re-fetch timeouts for new half
+  const half = quarter <= 2 ? 1 : (quarter <= 4 ? 2 : 3);
+  const overtime = Math.max(0, quarter - 4);
+
+  ['A', 'B'].forEach(teamKey => {
+    const teamId = teamKey === 'A' ? gameData.teamA.id : gameData.teamB.id;
+    const btn = document.getElementById(`timeouts${teamKey}`);
+
+    fetch('load_timeouts.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        game_id: gameData.gameId,
+        team_id: teamId,
+        half: half,
+        overtime: overtime
+      })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        btn.textContent = data.remaining;
+        btn.disabled = data.remaining <= 0;
+      }
+    });
+  });
 }
+
 
 // Initial UI update
 window.addEventListener('DOMContentLoaded', () => {
@@ -799,6 +867,22 @@ function adjustGameClock(delta) {
     saveTimerState();
   }
 }
+
+function adjustGameClockMinute(delta) {
+  if (!clocksRunning) {
+    const maxTime = quarter <= 4 ? 600 : 300;
+    gameClock = Math.max(0, Math.min(gameClock + delta * 60, maxTime));
+
+    // Ensure shot clock doesn't exceed game clock
+    if (shotClock > gameClock) {
+      shotClock = gameClock;
+    }
+
+    updateClocksUI();
+    saveTimerState();
+  }
+}
+
 
 function adjustShotClock(delta) {
   if (!clocksRunning) {
