@@ -205,3 +205,10 @@ tr:has(.in-game-checkbox:checked) {
     background-color: #999;
     cursor: not-allowed;
 }
+.name-cell {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+

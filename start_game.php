@@ -183,6 +183,7 @@ function loadTeamFouls(PDO $pdo, $game_id, $team_id, $quarter) {
 $foulsA = loadTeamFouls($pdo, $game_id, $game['hometeam_id'], $quarter_id);
 $foulsB = loadTeamFouls($pdo, $game_id, $game['awayteam_id'], $quarter_id);
 
+$winner_team_id = $game['winner_team_id'] ?? null;
 
 ?>
 
@@ -198,11 +199,19 @@ $foulsB = loadTeamFouls($pdo, $game_id, $game['awayteam_id'], $quarter_id);
 <body>
 
 <div class="score-display">
-  <span class="team-name"><?php echo htmlspecialchars($game['home_team_name']); ?></span>
+  <span class="team-name">
+  <?php echo htmlspecialchars($game['home_team_name']); ?>
+  <?php if ($game['hometeam_id'] == $winner_team_id) echo '<strong style="color:green;">(Winner)</strong>'; ?>
+</span>
+
   <span class="score" id="scoreA">0</span>
   <span class="separator">—</span>
   <span class="score" id="scoreB">0</span>
-  <span class="team-name"><?php echo htmlspecialchars($game['away_team_name']); ?></span>
+  <span class="team-name">
+  <?php echo htmlspecialchars($game['home_team_name']); ?>
+  <?php if ($game['hometeam_id'] == $winner_team_id) echo '<strong style="color:green;">(Winner)</strong>'; ?>
+</span>
+
 </div>
 
 <div class="timer-panel">
@@ -275,8 +284,8 @@ $foulsB = loadTeamFouls($pdo, $game_id, $game['awayteam_id'], $quarter_id);
       <thead>
         <tr>
           <th style="width: 30px;">In</th>
-          <th style="width: 50px;">#</th>
-          <th>Name</th>
+          <th style="width: 10px;">#</th>
+          <th style="width: 160px;">Name</th>
           <th>1PM</th><th>2PM</th><th>3PM</th><th>FOUL</th>
 <th>REB</th><th>AST</th><th>BLK</th><th>STL</th><th>TO</th><th>PTS</th>
 
@@ -319,6 +328,20 @@ $foulsB = loadTeamFouls($pdo, $game_id, $game['awayteam_id'], $quarter_id);
 </div>
 
 </div> <!-- teams-container -->
+<div style="margin-top: 20px; text-align: center;">
+  <button onclick="showOverridePanel()">Override Result</button>
+</div>
+
+<div id="overridePanel" style="display: none; text-align: center; margin-top: 10px;">
+  <label>Select Winner:
+    <select id="winnerSelect">
+      <option value="">-- Select --</option>
+      <option value="A"><?php echo htmlspecialchars($game['home_team_name']); ?></option>
+      <option value="B"><?php echo htmlspecialchars($game['away_team_name']); ?></option>
+    </select>
+  </label>
+  <button onclick="confirmOverride()">Save Winner</button>
+</div>
 
 
 
@@ -343,7 +366,8 @@ const playerStats = {
   teamA: gameData.teamA.players.map(p => ({
     id: p.id,
     jersey: p.jersey_number ?? '--',
-    name: `${p.first_name} ${p.last_name}`,
+    name: `${p.last_name.toUpperCase()}, ${p.first_name.charAt(0).toUpperCase()}.`,
+
     isPlaying: p.is_playing ?? 0,
     displayOrder: p.display_order ?? 999999,
     stats: {
@@ -362,7 +386,8 @@ const playerStats = {
   teamB: gameData.teamB.players.map(p => ({
     id: p.id,
     jersey: p.jersey_number ?? '--',
-    name: `${p.first_name} ${p.last_name}`,
+    name: `${p.last_name.toUpperCase()}, ${p.first_name.charAt(0).toUpperCase()}.`,
+
     isPlaying: p.is_playing ?? 0,
     displayOrder: p.display_order ?? 999999,
     stats: {
@@ -408,7 +433,7 @@ function renderTeam(teamId) {
     tr.innerHTML = `
       <td><input type="checkbox" class="in-game-checkbox" ${player.isPlaying ? 'checked' : ''} onchange="togglePlayer('${teamId}', ${idx}, this.checked)"></td>
       <td><input type="text" class="jersey-input" value="${player.jersey}" onchange="updateJersey('${teamId}', ${idx}, this.value)"></td>
-      <td>${player.name}</td>
+      <td class="name-cell">${player.name}</td>
       ${['1PM','2PM','3PM','FOUL','REB','AST','BLK','STL','TO'].map(stat => `
         <td class="stat-cell" onmouseover="showButtons(this)" onmouseleave="hideButtons(this)">
           ${stats[stat]}<span class="stat-controls">
@@ -908,6 +933,55 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   });
 });
+
+function showOverridePanel() {
+  document.getElementById('overridePanel').style.display = 'block';
+}
+
+function confirmOverride() {
+  const selected = document.getElementById('winnerSelect').value;
+  if (!selected) {
+    alert("Please select a winner.");
+    return;
+  }
+
+  const winnerTeam = selected === 'A' ? gameData.teamA : gameData.teamB;
+
+  if (!confirm(`Confirm ${winnerTeam.name} as winner?`)) return;
+
+  fetch('override_winner.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      game_id: gameData.gameId,
+      winner_team_id: winnerTeam.id
+    })
+  })
+  .then(res => res.json())
+  .then(data => {
+    if (data.success) {
+      alert("Winner saved!");
+      displayWinner(winnerTeam.id);
+    } else {
+      alert("Failed to save winner.");
+    }
+  })
+  .catch(err => {
+    console.error("Error overriding winner:", err);
+    alert("An error occurred.");
+  });
+}
+
+function displayWinner(teamId) {
+  const homeNameEl = document.querySelector('.score-display .team-name:first-child');
+  const awayNameEl = document.querySelector('.score-display .team-name:last-child');
+
+  if (parseInt(teamId) === gameData.teamA.id) {
+    homeNameEl.innerHTML += ' <strong style="color:green">(Winner)</strong>';
+  } else {
+    awayNameEl.innerHTML += ' <strong style="color:green">(Winner)</strong>';
+  }
+}
 
 
 
