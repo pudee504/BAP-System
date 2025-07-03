@@ -173,6 +173,15 @@ if ($timeoutsB === null) {
   $insert->execute([$game_id, $game['awayteam_id'], $current_half, $timeoutsB]);
 }
 
+function loadTeamFouls(PDO $pdo, $game_id, $team_id, $quarter) {
+  $stmt = $pdo->prepare("SELECT fouls FROM game_team_fouls WHERE game_id = ? AND team_id = ? AND quarter = ?");
+  $stmt->execute([$game_id, $team_id, $quarter]);
+  $row = $stmt->fetch(PDO::FETCH_ASSOC);
+  return $row ? (int)$row['fouls'] : 0;
+}
+
+$foulsA = loadTeamFouls($pdo, $game_id, $game['hometeam_id'], $quarter_id);
+$foulsB = loadTeamFouls($pdo, $game_id, $game['awayteam_id'], $quarter_id);
 
 
 ?>
@@ -257,7 +266,8 @@ if ($timeoutsB === null) {
 
 
 
-  <span>Team Fouls: <span id="foulsA">0</span></span>
+  <span>Team Fouls: <span id="foulsA"><?php echo $foulsA; ?></span> <strong id="bonus-teamA" style="color: red; display: none;">Bonus</strong></span>
+
 </div>
 
 
@@ -287,7 +297,8 @@ if ($timeoutsB === null) {
 
 
 
-  <span>Team Fouls: <span id="foulsB">0</span></span>
+  <span>Team Fouls: <span id="foulsB"><?php echo $foulsB; ?></span> <strong id="bonus-teamB" style="color: red; display: none;">Bonus</strong></span>
+
 </div>
 
 
@@ -488,6 +499,24 @@ function togglePlayer(teamId, playerIdx, isChecked) {
   renderTeam(teamId);
 }
 
+let teamFouls = {
+  teamA: <?php echo json_encode($foulsA); ?>,
+  teamB: <?php echo json_encode($foulsB); ?>
+};
+
+function updateBonusUI(teamId) {
+  const fouls = teamFouls[teamId];
+  const bonusEl = document.getElementById(`bonus-${teamId}`);
+  if (fouls >= 5) {
+    bonusEl.style.display = 'inline';
+  } else {
+    bonusEl.style.display = 'none';
+  }
+}
+
+updateBonusUI('teamA');
+updateBonusUI('teamB');
+
 
 
 
@@ -496,11 +525,36 @@ function updateStat(teamId, playerIdx, stat, delta) {
   const action = delta > 0 ? 'Add' : 'Remove';
   const confirmMsg = `${action} ${stat} ${delta > 0 ? 'to' : 'from'} ${player.name}?`;
   
-  if (!window.confirm(confirmMsg)) {
-    return;
-  }
+  if (!window.confirm(confirmMsg)) return;
 
   player.stats[stat] = Math.max(0, player.stats[stat] + delta);
+
+  if (stat === 'FOUL') {
+  teamFouls[teamId] += delta;
+
+  if (teamFouls[teamId] < 0) teamFouls[teamId] = 0;
+
+  document.getElementById(teamId === 'teamA' ? 'foulsA' : 'foulsB').textContent = teamFouls[teamId];
+
+  updateBonusUI(teamId);
+
+  // Save updated fouls to DB:
+  fetch('update_team_fouls.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      game_id: gameData.gameId,
+      team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id,
+      quarter: quarter,
+      fouls: teamFouls[teamId]
+    })
+  }).then(res => res.json()).then(data => {
+    if (!data.success) {
+      console.error(`Failed to update team fouls for ${teamId}`, data.error);
+    }
+  }).catch(console.error);
+}
+
 
   fetch('update_stat.php', {
     method: 'POST',
@@ -520,6 +574,7 @@ function updateStat(teamId, playerIdx, stat, delta) {
 
   renderTeam(teamId);
 }
+
 
 function showButtons(cell) {
   const btns = cell.querySelector('.stat-controls');
@@ -559,29 +614,43 @@ function updateClocksUI() {
   document.getElementById('quarterLabel').textContent = quarter <= 4 ? 
     ['1st', '2nd', '3rd', '4th'][quarter - 1] + ' Quarter' : `Overtime ${quarter - 4}`;
 
-  // Enable next quarter only when game clock is 0
   const nextBtn = document.getElementById('nextQuarterBtn');
   const finalizeBtn = document.getElementById('finalizeGameBtn');
-  if (nextBtn && finalizeBtn) {
-    if (gameClock === 0) {
-      const scoreA = parseInt(document.getElementById('scoreA').textContent);
-      const scoreB = parseInt(document.getElementById('scoreB').textContent);
 
+  if (!nextBtn || !finalizeBtn) return;
+
+  if (gameClock === 0) {
+    const scoreA = parseInt(document.getElementById('scoreA').textContent);
+    const scoreB = parseInt(document.getElementById('scoreB').textContent);
+
+    if (quarter < 4) {
+      // For quarters 1 to 3, enable next quarter button when clock is 0
+      nextBtn.disabled = false;
+      finalizeBtn.style.display = 'none';
+    } else if (quarter === 4) {
+      // 4th quarter
       if (scoreA === scoreB) {
-        if (quarter >= 4) {
-          nextBtn.disabled = false;       // Allow overtime
-          finalizeBtn.style.display = 'none';
-        }
+        // Tie -> enable next quarter button (overtime)
+        nextBtn.disabled = false;
+        finalizeBtn.style.display = 'none';
       } else {
+        // Not tie -> disable next quarter, show finalize
         nextBtn.disabled = true;
-        finalizeBtn.style.display = 'inline-block'; // Show finalize button
+        finalizeBtn.style.display = 'inline-block';
       }
     } else {
-      nextBtn.disabled = true;
+      // Overtime quarters
+      // Let's just enable next quarter button always
+      nextBtn.disabled = false;
       finalizeBtn.style.display = 'none';
     }
+  } else {
+    // Clock not zero -> disable next quarter and hide finalize
+    nextBtn.disabled = true;
+    finalizeBtn.style.display = 'none';
   }
 }
+
 
 function finalizeGame() {
   if (!confirm("Are you sure you want to finalize the game?")) return;
@@ -684,6 +753,28 @@ function nextQuarter() {
   resetShotClock(false);
   updateClocksUI();
   saveTimerState();
+
+  // 🆕 Reset team fouls and hide bonus
+  teamFouls.teamA = 0;
+  teamFouls.teamB = 0;
+  document.getElementById('foulsA').textContent = 0;
+  document.getElementById('foulsB').textContent = 0;
+  document.getElementById('bonus-teamA').style.display = 'none';
+  document.getElementById('bonus-teamB').style.display = 'none';
+
+  ['teamA', 'teamB'].forEach(teamId => {
+  fetch('update_team_fouls.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      game_id: gameData.gameId,
+      team_id: gameData[teamId].id,
+      quarter: quarter,
+      fouls: 0
+    })
+  });
+});
+
 
   // Re-fetch timeouts for new half
   const half = quarter <= 2 ? 1 : (quarter <= 4 ? 2 : 3);
