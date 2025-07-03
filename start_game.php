@@ -499,6 +499,30 @@ function togglePlayer(teamId, playerIdx, isChecked) {
   renderTeam(teamId);
 }
 
+function updateJersey(teamId, playerIdx, jerseyNumber) {
+  const player = playerStats[teamId][playerIdx];
+  player.jersey = jerseyNumber;
+
+  // Save jersey to DB
+  fetch('update_jersey_number.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      game_id: gameData.gameId,
+      player_id: player.id,
+      team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id,
+      jersey_number: jerseyNumber
+    })
+  }).then(res => res.json()).then(data => {
+    if (!data.success) {
+      console.error(`Failed to update jersey for ${player.name}:`, data.error);
+    }
+  }).catch(err => {
+    console.error(`Error updating jersey for ${player.name}:`, err);
+  });
+}
+
+
 let teamFouls = {
   teamA: <?php echo json_encode($foulsA); ?>,
   teamB: <?php echo json_encode($foulsB); ?>
