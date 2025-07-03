@@ -131,6 +131,21 @@ $away_players = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Update game status
 $pdo->prepare("UPDATE game SET game_status = 'Active' WHERE id = ?")->execute([$game_id]);
 
+function fetchTimeoutData($pdo, $game_id, $team_id) {
+  $stmt = $pdo->prepare("SELECT * FROM game_timeouts WHERE game_id = ? AND team_id = ?");
+  $stmt->execute([$game_id, $team_id]);
+  $data = $stmt->fetch(PDO::FETCH_ASSOC);
+  return $data ?: ['first_half_used' => 0, 'second_half_used' => 0, 'overtimes_used' => '[]'];
+}
+
+$timeouts_home = fetchTimeoutData($pdo, $game_id, $game['hometeam_id']);
+$timeouts_away = fetchTimeoutData($pdo, $game_id, $game['awayteam_id']);
+
+// Convert 'overtimes_used' from JSON string to PHP array
+$timeouts_home['overtimes_used'] = json_decode($timeouts_home['overtimes_used'] ?? '[]', true);
+$timeouts_away['overtimes_used'] = json_decode($timeouts_away['overtimes_used'] ?? '[]', true);
+
+
 ?>
 
 <!DOCTYPE html>
@@ -347,7 +362,8 @@ $pdo->prepare("UPDATE game SET game_status = 'Active' WHERE id = ?")->execute([$
     
 
     <div class="score-line">
-  <span>Timeouts: <span id="timeoutsA">0</span></span>
+  <span>Timeouts: <button onclick="useTimeout('teamA')" id="timeoutsA">2</button></span>
+
   <span>Team Fouls: <span id="foulsA">0</span></span>
 </div>
 
@@ -370,7 +386,8 @@ $pdo->prepare("UPDATE game SET game_status = 'Active' WHERE id = ?")->execute([$
   <div class="team-box" id="teamB">
     
    <div class="score-line">
-  <span>Timeouts: <span id="timeoutsB">0</span></span>
+ <span>Timeouts: <button onclick="useTimeout('teamB')" id="timeoutsB">2</button></span>
+
   <span>Team Fouls: <span id="foulsB">0</span></span>
 </div>
 
@@ -390,15 +407,24 @@ $pdo->prepare("UPDATE game SET game_status = 'Active' WHERE id = ?")->execute([$
     </table>
   </div>
 </div>
-
 </div> <!-- teams-container -->
 
-<div style="text-align:center; margin-top: 20px;">
-  <a class="settings-link" href="game_settings.php?game_id=<?php echo urlencode($game_id); ?>">⚙ Game Settings</a>
-</div>
 
 
 <script>
+const timeoutsUsed = {
+  teamA: {
+    firstHalf: <?php echo (int)$timeouts_home['first_half_used']; ?>,
+    secondHalf: <?php echo (int)$timeouts_home['second_half_used']; ?>,
+    overtimes: <?php echo json_encode($timeouts_home['overtimes_used']); ?>
+  },
+  teamB: {
+    firstHalf: <?php echo (int)$timeouts_away['first_half_used']; ?>,
+    secondHalf: <?php echo (int)$timeouts_away['second_half_used']; ?>,
+    overtimes: <?php echo json_encode($timeouts_away['overtimes_used']); ?>
+  }
+};
+
 const gameData = {
   gameId: <?php echo json_encode($game_id); ?>,
   teamA: {
@@ -412,6 +438,14 @@ const gameData = {
     players: <?php echo json_encode($away_players); ?>
   }
 };
+
+const timeoutRules = {
+  perHalf: 2,
+  secondHalf: 3,
+  overtime: 1
+};
+
+
 
 console.log('Game Data:', gameData);
 
@@ -461,6 +495,70 @@ const inGameCounts = {
   teamA: playerStats.teamA.filter(p => p.isPlaying).length,
   teamB: playerStats.teamB.filter(p => p.isPlaying).length
 };
+
+function getAllowedTimeouts(quarter) {
+  if (quarter <= 2) return timeoutRules.perHalf;
+  if (quarter <= 4) return timeoutRules.secondHalf;
+  return timeoutRules.overtime;
+}
+
+function useTimeout(teamId) {
+  const target = timeoutsUsed[teamId];
+
+  if (quarter <= 2) {
+    if (target.firstHalf >= timeoutRules.perHalf) {
+      alert(`${gameData[teamId].name} has no timeouts left in the 1st half.`);
+      return;
+    }
+    target.firstHalf++;
+    updateTimeoutDisplay(teamId);
+  } else if (quarter <= 4) {
+    if (target.secondHalf >= timeoutRules.secondHalf) {
+      alert(`${gameData[teamId].name} has no timeouts left in the 2nd half.`);
+      return;
+    }
+    target.secondHalf++;
+    updateTimeoutDisplay(teamId);
+  } else {
+    const otIndex = quarter - 5; // Overtime 1 = index 0
+    target.overtimes[otIndex] = (target.overtimes[otIndex] || 0) + 1;
+    if (target.overtimes[otIndex] > timeoutRules.overtime) {
+      alert(`${gameData[teamId].name} has no timeouts left in Overtime ${otIndex + 1}.`);
+      target.overtimes[otIndex] = timeoutRules.overtime; // Clamp back
+      return;
+    }
+    updateTimeoutDisplay(teamId);
+  }
+
+  saveTimeoutsToServer();
+}
+
+function updateTimeoutDisplay(teamId) {
+  const t = timeoutsUsed[teamId];
+  let remaining = 0;
+  if (quarter <= 2) remaining = timeoutRules.perHalf - t.firstHalf;
+  else if (quarter <= 4) remaining = timeoutRules.secondHalf - t.secondHalf;
+  else {
+    const otIndex = quarter - 5;
+    remaining = timeoutRules.overtime - (t.overtimes[otIndex] || 0);
+  }
+
+  document.getElementById(teamId === 'teamA' ? 'timeoutsA' : 'timeoutsB').textContent = remaining;
+}
+
+function saveTimeoutsToServer() {
+  fetch('save_timeouts.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      game_id: gameData.gameId,
+      teamA_id: gameData.teamA.id,
+      teamB_id: gameData.teamB.id,
+      timeoutsUsed
+    })
+  });
+}
+
 
 function calculatePoints(stats) {
   return stats['1PM'] * 1 + stats['2PM'] * 2 + stats['3PM'] * 3;
@@ -719,16 +817,22 @@ function nextQuarter() {
   gameClock = quarter <= 4 ? 600 : 300;
   resetShotClock(false);
   updateClocksUI();
+  updateTimeoutDisplay('teamA');
+  updateTimeoutDisplay('teamB');
   saveTimerState();
 }
+
 
 // Initial UI update
 window.addEventListener('DOMContentLoaded', () => {
   updateClocksUI();
+  updateTimeoutDisplay('teamA');
+  updateTimeoutDisplay('teamB');
   if (clocksRunning) {
     startClocks();
   }
 });
+
 
 function adjustGameClock(delta) {
   if (!clocksRunning) {
