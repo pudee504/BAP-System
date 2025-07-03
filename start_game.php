@@ -180,180 +180,10 @@ if ($timeoutsB === null) {
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" viewport="width=device-width, initial-scale=1.0">
   <title>Basketball Game Box Score - Game #<?php echo htmlspecialchars($game_id); ?></title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    .teams-container { display: flex; justify-content: space-between; gap: 20px; }
-    .team-box { width: 49%; border: 1px solid #ccc; border-radius: 8px; padding: 10px; }
-    .team-header { font-weight: bold; text-align: center; margin-bottom: 10px; }
-    .score-line {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: bold;
-  margin-bottom: 5px;
-}
+  <link rel="stylesheet" href="/league_management_system/game.css">
 
-.score-value {
-  font-size: 24px;
-  font-weight: bold;
-  color: #333;
-}
-
-    table { width: 100%; border-collapse: collapse; font-size: 14px; }
-    th, td { border: 1px solid #ddd; padding: 4px; text-align: center; position: relative; }
-    th { background-color: #f2f2f2; }
-    .stat-cell:hover .stat-controls { display: inline-flex; }
-    .stat-controls { display: none; gap: 4px; position: absolute; right: 4px; top: 2px; }
-    .stat-controls button { font-size: 12px; padding: 1px 5px; }
-    .jersey-input { width: 50px; text-align: center; }
-    .in-game-checkbox { cursor: pointer; }
-    tr:has(.in-game-checkbox:checked) { background-color: #e0ffe0; }
-    .shared-score {
-  text-align: center;
-  font-size: 32px;
-  font-weight: bold;
-  margin-bottom: 30px;
-}
-
-.score-display {
-  position: sticky;
-  top: 0;
-  z-index: 999;
-  background: white;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 10px 0;
-  border-bottom: 1px solid #ccc;
-  font-size: 24px;
-  font-weight: bold;
-  text-align: center;
-}
-
-.score-display .team-name {
-  flex: 1 1 auto;
-  max-width: 150px;
-  padding: 0 8px;
-  white-space: nowrap;
-}
-
-.score-display .score,
-.score-display .separator {
-  min-width: 30px;
-  flex-shrink: 0;
-  font-size: 32px;
-}
-
-.timer-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 10px 0;
-  background-color: #f9f9f9;
-  border-bottom: 1px solid #ddd;
-}
-
-.timer-panel .quarter {
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 5px;
-}
-
-.timer-panel .timers {
-  display: flex;
-  gap: 20px;
-  font-size: 32px;
-  font-weight: bold;
-}
-
-.timer-panel .game-clock,
-.timer-panel .shot-clock {
-  padding: 6px 16px;
-  border: 2px solid #333;
-  border-radius: 6px;
-  background-color: #fff;
-}
-.fixed-header {
-      position: sticky;
-      top: 0;
-      background-color: white;
-      padding: 10px 0;
-      z-index: 1000;
-      border-bottom: 2px solid #ddd;
-    }
-
-.timers {
-  display: flex;
-  gap: 40px;
-  font-size: 32px;
-  font-weight: bold;
-  align-items: center;
-  justify-content: center;
-}
-
-.clock-control {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.adjust-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.adjust-buttons button {
-  width: 32px;
-  height: 32px;
-  font-size: 20px;
-  line-height: 1;
-  cursor: pointer;
-  border: 1px solid #ccc;
-  background-color: #f2f2f2;
-  border-radius: 4px;
-}
-.settings-link {
-  display: inline-block;
-  margin: 20px auto;
-  font-size: 14px;
-  background-color: #007bff;
-  color: white;
-  padding: 8px 16px;
-  border-radius: 6px;
-  text-decoration: none;
-  text-align: center;
-}
-.settings-link:hover {
-  background-color: #0056b3;
-}
-
-.timeout-click {
-  padding: 4px 10px;
-  font-size: 14px;
-  font-weight: bold;
-  background-color: #007bff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-.timeout-click:hover {
-  background-color: #0056b3;
-}
-.timeout-click:disabled {
-  background-color: #999;
-  cursor: not-allowed;
-}
-
-
-
-  </style>
   
 </head>
 <body>
@@ -405,6 +235,8 @@ if ($timeoutsB === null) {
   <button onclick="offensiveRebound()">Same Possesion</button>
   <button onclick="resetShotClock(false)">Change Possession</button>
   <button id="nextQuarterBtn" onclick="nextQuarter()" disabled>Next Quarter</button>
+  <button id="finalizeGameBtn" onclick="finalizeGame()" style="display:none;">Finalize Game</button>
+
 
 </div>
 
@@ -729,9 +561,46 @@ function updateClocksUI() {
 
   // Enable next quarter only when game clock is 0
   const nextBtn = document.getElementById('nextQuarterBtn');
-  if (nextBtn) {
-    nextBtn.disabled = gameClock !== 0;
+  const finalizeBtn = document.getElementById('finalizeGameBtn');
+  if (nextBtn && finalizeBtn) {
+    if (gameClock === 0) {
+      const scoreA = parseInt(document.getElementById('scoreA').textContent);
+      const scoreB = parseInt(document.getElementById('scoreB').textContent);
+
+      if (scoreA === scoreB) {
+        if (quarter >= 4) {
+          nextBtn.disabled = false;       // Allow overtime
+          finalizeBtn.style.display = 'none';
+        }
+      } else {
+        nextBtn.disabled = true;
+        finalizeBtn.style.display = 'inline-block'; // Show finalize button
+      }
+    } else {
+      nextBtn.disabled = true;
+      finalizeBtn.style.display = 'none';
+    }
   }
+}
+
+function finalizeGame() {
+  if (!confirm("Are you sure you want to finalize the game?")) return;
+
+  fetch('finalize_game.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ game_id: gameData.gameId })
+  }).then(res => res.json()).then(data => {
+    if (data.success) {
+      alert("Game finalized!");
+      window.location.href = `/league_management_system/game_summary.php?game_id=${gameData.gameId}`;
+    } else {
+      alert("Failed to finalize game: " + data.error);
+    }
+  }).catch(err => {
+    alert("Error finalizing game.");
+    console.error(err);
+  });
 }
 
 
