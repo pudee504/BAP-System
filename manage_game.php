@@ -200,22 +200,25 @@ $winner_team_id = $game['winner_team_id'] ?? null;
 
 <div class="score-display">
   <div class="team-name-box left" id="home-box">
-    <?php if ($game['winnerteam_id'] == $game['hometeam_id']): ?>
-      <span class="winner-label" style="color:green;font-weight:bold;">(Winner)</span>
-    <?php endif; ?>
-    <span class="team-name"><?php echo htmlspecialchars($game['home_team_name']); ?></span>
-  </div>
+  <span class="winner-label" style="min-width:65px; display:inline-block; <?php echo ($game['winnerteam_id'] == $game['hometeam_id']) ? 'color:green;font-weight:bold;visibility:visible;' : 'visibility:hidden;'; ?>">
+    (Winner)
+  </span>
+  <span class="team-name"><?php echo htmlspecialchars($game['home_team_name']); ?></span>
+</div>
+
 
   <span class="score" id="scoreA"><?php echo $game['home_score']; ?></span>
   <span class="separator">—</span>
   <span class="score" id="scoreB"><?php echo $game['away_score']; ?></span>
+  
 
   <div class="team-name-box right" id="away-box">
-    <span class="team-name"><?php echo htmlspecialchars($game['away_team_name']); ?></span>
-    <?php if ($game['winnerteam_id'] == $game['awayteam_id']): ?>
-      <span class="winner-label" style="color:green;font-weight:bold;">(Winner)</span>
-    <?php endif; ?>
-  </div>
+  <span class="team-name"><?php echo htmlspecialchars($game['away_team_name']); ?></span>
+  <span class="winner-label" style="min-width:65px; display:inline-block; <?php echo ($game['winnerteam_id'] == $game['awayteam_id']) ? 'color:green;font-weight:bold;visibility:visible;' : 'visibility:hidden;'; ?>">
+    (Winner)
+  </span>
+</div>
+
 </div>
 
 
@@ -351,7 +354,7 @@ $winner_team_id = $game['winner_team_id'] ?? null;
       <option value="B"><?php echo htmlspecialchars($game['away_team_name']); ?></option>
     </select>
   </label>
-  <button onclick="confirmOverride()">Save Winner</button>
+  <button onclick="saveWinner()">Save Winner</button>
 </div>
 
 
@@ -949,7 +952,7 @@ function showOverridePanel() {
   document.getElementById('overridePanel').style.display = 'block';
 }
 
-function confirmOverride() {
+function saveWinner() {
   const selected = document.getElementById('winnerSelect').value;
   if (!selected) {
     alert("Please select a winner.");
@@ -960,7 +963,7 @@ function confirmOverride() {
 
   if (!confirm(`Confirm ${winnerTeam.name} as winner?`)) return;
 
-  fetch('override_winner.php', {
+  fetch('save_winner.php', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
