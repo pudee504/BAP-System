@@ -199,20 +199,31 @@ $winner_team_id = $game['winner_team_id'] ?? null;
 <body>
 
 <div class="score-display">
-  <span class="team-name">
-  <?php echo htmlspecialchars($game['home_team_name']); ?>
-  <?php if ($game['hometeam_id'] == $winner_team_id) echo '<strong style="color:green;">(Winner)</strong>'; ?>
-</span>
+  <div class="team-name-box left" id="home-box">
+    <?php if ($game['winnerteam_id'] == $game['hometeam_id']): ?>
+      <span class="winner-label" style="color:green;font-weight:bold;">(Winner)</span>
+    <?php endif; ?>
+    <span class="team-name"><?php echo htmlspecialchars($game['home_team_name']); ?></span>
+  </div>
 
-  <span class="score" id="scoreA">0</span>
+  <span class="score" id="scoreA"><?php echo $game['home_score']; ?></span>
   <span class="separator">—</span>
-  <span class="score" id="scoreB">0</span>
-  <span class="team-name">
-  <?php echo htmlspecialchars($game['home_team_name']); ?>
-  <?php if ($game['hometeam_id'] == $winner_team_id) echo '<strong style="color:green;">(Winner)</strong>'; ?>
-</span>
+  <span class="score" id="scoreB"><?php echo $game['away_score']; ?></span>
 
+  <div class="team-name-box right" id="away-box">
+    <span class="team-name"><?php echo htmlspecialchars($game['away_team_name']); ?></span>
+    <?php if ($game['winnerteam_id'] == $game['awayteam_id']): ?>
+      <span class="winner-label" style="color:green;font-weight:bold;">(Winner)</span>
+    <?php endif; ?>
+  </div>
 </div>
+
+
+
+
+
+
+
 
 <div class="timer-panel">
 
@@ -972,18 +983,31 @@ function confirmOverride() {
   });
 }
 
-function displayWinner(teamId) {
-  const homeNameEl = document.querySelector('.score-display .team-name:first-child');
-  const awayNameEl = document.querySelector('.score-display .team-name:last-child');
+function displayWinner(winnerId) {
+  // Remove all old winner labels
+  document.querySelectorAll('.winner-label').forEach(el => el.remove());
 
-  if (parseInt(teamId) === gameData.teamA.id) {
-    homeNameEl.innerHTML += ' <strong style="color:green">(Winner)</strong>';
-  } else {
-    awayNameEl.innerHTML += ' <strong style="color:green">(Winner)</strong>';
+  // Create new label
+  const label = document.createElement('span');
+  label.classList.add('winner-label');
+  label.textContent = '(Winner)';
+
+  // Append to correct box
+  if (winnerId == gameData.homeTeamId) {
+    const homeBox = document.getElementById('home-box');
+    homeBox.prepend(label);
+  } else if (winnerId == gameData.awayTeamId) {
+    const awayBox = document.getElementById('away-box');
+    awayBox.appendChild(label);
   }
 }
 
-
+// Display winner label immediately on load (if any)
+document.addEventListener('DOMContentLoaded', () => {
+  if (gameData.winnerTeamId) {
+    displayWinner(gameData.winnerTeamId);
+  }
+});
 
 
 

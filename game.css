@@ -83,36 +83,7 @@ tr:has(.in-game-checkbox:checked) {
     background-color: #e0ffe0; 
 }
 
-.score-display {
-    position: sticky;
-    top: 0;
-    z-index: 999;
-    background: white;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 12px;
-    padding: 10px 0;
-    border-bottom: 1px solid #ccc;
-    font-size: 24px;
-    font-weight: bold;
-    text-align: center;
-}
 
-.score-display .team-name {
-    flex: 1 1 auto;
-    max-width: 150px;
-    padding: 0 8px;
-    white-space: nowrap;
-}
-
-.score-display .score,
-.score-display .separator {
-    min-width: 30px;
-    flex-shrink: 0;
-    font-size: 32px;
-}
 
 .timer-panel {
     display: flex;
@@ -209,6 +180,55 @@ tr:has(.in-game-checkbox:checked) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 160px;
+  display: inline-block;
+}
+.score-display {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 24px;
+  font-weight: bold;
+  gap: 30px;
+  padding: 12px 0;
+  border-bottom: 1px solid #ccc;
 }
 
+.team-name-box {
+  display: flex;
+  align-items: center;
+  min-width: 140px;
+}
 
+.team-name-box.left {
+  justify-content: flex-end;
+  gap: 8px; /* Space between label and name */
+  flex-direction: row; /* Label on the left of name */
+}
+
+.team-name-box.right {
+  justify-content: flex-start;
+  gap: 8px; /* Space between name and label */
+  flex-direction: row; /* Name on left, label on right */
+}
+
+.winner-label {
+  color: green;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.team-name {
+  white-space: nowrap;
+}
+
+.score {
+  font-size: 32px;
+  min-width: 40px;
+  text-align: center;
+}
+
+.separator {
+  font-size: 28px;
+  padding: 0 10px;
+}
