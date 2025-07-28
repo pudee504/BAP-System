@@ -110,8 +110,8 @@ $home_players = $stmt->fetchAll(PDO::FETCH_ASSOC);
 $stmt->execute([$game_id, $game['awayteam_id'], $game['awayteam_id']]);
 $away_players = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// Update game status
-$pdo->prepare("UPDATE game SET game_status = 'Active' WHERE id = ?")->execute([$game_id]);
+// Update game status if not finalized
+$pdo->prepare("UPDATE game SET game_status = 'Active' WHERE id = ? AND game_status != 'Final'")->execute([$game_id]);
 
 // Helper functions
 function getCurrentHalf($quarter) {
@@ -182,22 +182,22 @@ $winner_team_id = $game['winner_team_id'] ?? null;
 </head>
 <body>
     <div class="score-display">
-        <div class="team-name-box left" id="home-box">
-            <span class="winner-label" style="min-width:65px; display:inline-block; <?php echo ($game['winnerteam_id'] == $game['hometeam_id']) ? 'color:green;font-weight:bold;visibility:visible;' : 'visibility:hidden;'; ?>">
-                (Winner)
-            </span>
-            <span class="team-name"><?php echo htmlspecialchars($game['home_team_name']); ?></span>
-        </div>
-        <span class="score" id="scoreA"><?php echo $game['hometeam_score']; ?></span>
-        <span class="separator">—</span>
-        <span class="score" id="scoreB"><?php echo $game['awayteam_score']; ?></span>
-        <div class="team-name-box right" id="away-box">
-            <span class="team-name"><?php echo htmlspecialchars($game['away_team_name']); ?></span>
-            <span class="winner-label" style="min-width:65px; display:inline-block; <?php echo ($game['winnerteam_id'] == $game['awayteam_id']) ? 'color:green;font-weight:bold;visibility:visible;' : 'visibility:hidden;'; ?>">
-                (Winner)
-            </span>
-        </div>
+    <div class="team-name-box left" id="home-box">
+        <span class="winner-label" style="<?php echo ($game['winnerteam_id'] == $game['hometeam_id']) ? 'visibility:visible;' : 'visibility:hidden;'; ?>">
+            (Winner)
+        </span>
+        <span class="team-name"><?php echo htmlspecialchars($game['home_team_name']); ?></span>
     </div>
+    <span class="score" id="scoreA"><?php echo $game['hometeam_score']; ?></span>
+    <span class="separator">—</span>
+    <span class="score" id="scoreB"><?php echo $game['awayteam_score']; ?></span>
+    <div class="team-name-box right" id="away-box">
+        <span class="team-name"><?php echo htmlspecialchars($game['away_team_name']); ?></span>
+        <span class="winner-label" style="<?php echo ($game['winnerteam_id'] == $game['awayteam_id']) ? 'visibility:visible;' : 'visibility:hidden;'; ?>">
+            (Winner)
+        </span>
+    </div>
+</div>
 
     <div class="timer-panel">
         <div class="quarter" id="quarterLabel">1st Quarter</div>
@@ -308,7 +308,9 @@ $winner_team_id = $game['winner_team_id'] ?? null;
                 id: <?php echo json_encode($game['awayteam_id']); ?>,
                 name: <?php echo json_encode($game['away_team_name']); ?>,
                 players: <?php echo json_encode($away_players); ?>
-            }
+            },
+            winnerTeamId: <?php echo json_encode($game['winner_team_id'] ?? null); ?>,
+            gameStatus: <?php echo json_encode($game['game_status'] ?? 'Active'); ?>
         };
 
         const playerStats = {
@@ -375,6 +377,22 @@ $winner_team_id = $game['winner_team_id'] ?? null;
             const players = playerStats[teamId];
             const total = players.reduce((sum, p) => sum + calculatePoints(p.stats), 0);
             document.getElementById(teamId === 'teamA' ? 'scoreA' : 'scoreB').textContent = total;
+            const scoreA = parseInt(document.getElementById('scoreA').textContent) || 0;
+            const scoreB = parseInt(document.getElementById('scoreB').textContent) || 0;
+            fetch('update_game_scores.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    game_id: gameData.gameId,
+                    hometeam_score: scoreA,
+                    awayteam_score: scoreB
+                })
+            }).then(res => res.json()).then(data => {
+                if (!data.success) {
+                    console.error('Failed to update scores:', data.error);
+                }
+            }).catch(error => console.error('Error updating scores:', error));
+            updateClocksUI();
         }
 
         function renderTeam(teamId) {
@@ -386,15 +404,15 @@ $winner_team_id = $game['winner_team_id'] ?? null;
                 const totalPts = calculatePoints(stats);
                 const isFouledOut = stats['FOUL'] >= 5;
                 tr.innerHTML = `
-                    <td><input type="checkbox" class="in-game-checkbox" ${player.isPlaying ? 'checked' : ''} onchange="togglePlayer('${teamId}', ${idx}, this.checked)"></td>
-                    <td><input type="text" class="jersey-input" value="${player.jersey}" onchange="updateJersey('${teamId}', ${idx}, this.value)"></td>
+                    <td><input type="checkbox" class="in-game-checkbox" ${player.isPlaying ? 'checked' : ''} onchange="togglePlayer('${teamId}', ${idx}, this.checked)" ${gameData.gameStatus === 'Final' ? 'disabled' : ''}></td>
+                    <td><input type="text" class="jersey-input" value="${player.jersey}" onchange="updateJersey('${teamId}', ${idx}, this.value)" ${gameData.gameStatus === 'Final' ? 'disabled' : ''}></td>
                     <td class="name-cell">${player.name}</td>
                     ${['1PM','2PM','3PM','FOUL','REB','AST','BLK','STL','TO'].map(stat => `
                         <td class="stat-cell" onmouseover="showButtons(this)" onmouseleave="hideButtons(this)">
                             <span style="${stat === 'FOUL' && isFouledOut ? 'color: red;' : ''}">${stats[stat]}</span>
-                            <span class="stat-controls">
-                                <button onclick="updateStat('${teamId}', ${idx}, '${stat}', 1)" ${stat === 'FOUL' && isFouledOut ? 'disabled' : ''}>+</button>
-                                <button onclick="updateStat('${teamId}', ${idx}, '${stat}', -1)" ${stat === 'FOUL' && isFouledOut ? 'disabled' : ''}>-</button>
+                            <span class="stat-controls" style="display: none;">
+                                <button onclick="updateStat('${teamId}', ${idx}, '${stat}', 1)" ${stat === 'FOUL' && isFouledOut || gameData.gameStatus === 'Final' ? 'disabled' : ''}>+</button>
+                                <button onclick="updateStat('${teamId}', ${idx}, '${stat}', -1)" ${stat === 'FOUL' && isFouledOut || gameData.gameStatus === 'Final' ? 'disabled' : ''}>-</button>
                             </span>
                         </td>`).join('')}
                     <td id="pts-${teamId}-${idx}">${totalPts}</td>
@@ -402,7 +420,6 @@ $winner_team_id = $game['winner_team_id'] ?? null;
                 tbody.appendChild(tr);
             });
             updateRunningScore(teamId);
-            console.log(`Rendered ${teamId}:`, playerStats[teamId].map(p => ({ name: p.name, isPlaying: p.isPlaying, displayOrder: p.displayOrder, stats: p.stats })));
         }
 
         function updatePlayerOrder(teamId) {
@@ -421,13 +438,12 @@ $winner_team_id = $game['winner_team_id'] ?? null;
             }).then(response => response.json()).then(data => {
                 if (!data.success) {
                     console.error(`Failed to update order for ${teamId}:`, data.error);
-                } else {
-                    console.log(`Order updated successfully for ${teamId}`);
                 }
             }).catch(error => console.error(`Error updating order for ${teamId}:`, error));
         }
 
         function togglePlayer(teamId, playerIdx, isChecked) {
+            if (gameData.gameStatus === 'Final') return;
             const players = playerStats[teamId];
             const player = players[playerIdx];
             const inGamePlayers = players.filter(p => p.isPlaying);
@@ -462,6 +478,7 @@ $winner_team_id = $game['winner_team_id'] ?? null;
         }
 
         function updateJersey(teamId, playerIdx, jerseyNumber) {
+            if (gameData.gameStatus === 'Final') return;
             const player = playerStats[teamId][playerIdx];
             player.jersey = jerseyNumber;
             fetch('update_jersey_number.php', {
@@ -477,9 +494,7 @@ $winner_team_id = $game['winner_team_id'] ?? null;
                 if (!data.success) {
                     console.error(`Failed to update jersey for ${player.name}:`, data.error);
                 }
-            }).catch(err => {
-                console.error(`Error updating jersey for ${player.name}:`, err);
-            });
+            }).catch(err => console.error(`Error updating jersey for ${player.name}:`, err));
         }
 
         function updateBonusUI(teamId) {
@@ -489,6 +504,7 @@ $winner_team_id = $game['winner_team_id'] ?? null;
         }
 
         function updateStat(teamId, playerIdx, stat, delta) {
+            if (gameData.gameStatus === 'Final') return;
             const player = playerStats[teamId][playerIdx];
             const action = delta > 0 ? 'Add' : 'Remove';
             if (!window.confirm(`${action} ${stat} ${delta > 0 ? 'to' : 'from'} ${player.name}?`)) return;
@@ -530,11 +546,12 @@ $winner_team_id = $game['winner_team_id'] ?? null;
                 if (!data.success) {
                     console.error(`Failed to update stat for ${player.name}:`, data.error);
                 }
+                renderTeam(teamId);
             }).catch(error => console.error(`Error updating stat for ${player.name}:`, error));
-            renderTeam(teamId);
         }
 
         function showButtons(cell) {
+            if (gameData.gameStatus === 'Final') return;
             const btns = cell.querySelector('.stat-controls');
             if (btns) btns.style.display = 'inline-flex';
         }
@@ -557,19 +574,24 @@ $winner_team_id = $game['winner_team_id'] ?? null;
                 ['1st', '2nd', '3rd', '4th'][quarter - 1] + ' Quarter' : `Overtime ${quarter - 4}`;
             const nextBtn = document.getElementById('nextQuarterBtn');
             const finalizeBtn = document.getElementById('finalizeGameBtn');
-            if (!nextBtn || !finalizeBtn) return;
+            if (!nextBtn || !finalizeBtn) {
+                console.error('Buttons not found:', { nextBtn, finalizeBtn });
+                return;
+            }
+            if (gameData.gameStatus === 'Final' || gameData.winnerTeamId) {
+                nextBtn.disabled = true;
+                finalizeBtn.style.display = 'none';
+                return;
+            }
             if (gameClock === 0) {
-                const scoreA = parseInt(document.getElementById('scoreA').textContent);
-                const scoreB = parseInt(document.getElementById('scoreB').textContent);
+                const scoreA = parseInt(document.getElementById('scoreA').textContent) || 0;
+                const scoreB = parseInt(document.getElementById('scoreB').textContent) || 0;
                 if (quarter < 4) {
                     nextBtn.disabled = false;
                     finalizeBtn.style.display = 'none';
-                } else if (quarter === 4) {
+                } else {
                     nextBtn.disabled = scoreA === scoreB ? false : true;
                     finalizeBtn.style.display = scoreA === scoreB ? 'none' : 'inline-block';
-                } else {
-                    nextBtn.disabled = false;
-                    finalizeBtn.style.display = 'none';
                 }
             } else {
                 nextBtn.disabled = true;
@@ -588,10 +610,15 @@ $winner_team_id = $game['winner_team_id'] ?? null;
                     quarter_id: quarter,
                     running: clocksRunning
                 })
-            });
+            }).then(res => res.json()).then(data => {
+                if (!data.success) {
+                    console.error('Failed to save timer state:', data.error);
+                }
+            }).catch(error => console.error('Error saving timer state:', error));
         }
 
         function startClocks() {
+            if (gameData.gameStatus === 'Final') return;
             if (!gameClockInterval) {
                 gameClockInterval = setInterval(() => {
                     if (gameClock > 0) gameClock--;
@@ -630,6 +657,7 @@ $winner_team_id = $game['winner_team_id'] ?? null;
         }
 
         function resetShotClock(isOffensiveRebound = false) {
+            if (gameData.gameStatus === 'Final') return;
             const maxShot = isOffensiveRebound ? 14 : 24;
             shotClock = Math.min(gameClock, maxShot);
             updateClocksUI();
@@ -641,6 +669,7 @@ $winner_team_id = $game['winner_team_id'] ?? null;
         }
 
         function nextQuarter() {
+            if (gameData.gameStatus === 'Final') return;
             quarter++;
             gameClock = quarter <= 4 ? 600 : 300;
             resetShotClock(false);
@@ -662,7 +691,11 @@ $winner_team_id = $game['winner_team_id'] ?? null;
                         quarter: quarter,
                         fouls: 0
                     })
-                });
+                }).then(res => res.json()).then(data => {
+                    if (!data.success) {
+                        console.error(`Failed to update team fouls for ${teamId}:`, data.error);
+                    }
+                }).catch(error => console.error(`Error updating team fouls for ${teamId}:`, error));
             });
             const half = quarter <= 2 ? 1 : (quarter <= 4 ? 2 : 3);
             const overtime = Math.max(0, quarter - 4);
@@ -685,87 +718,116 @@ $winner_team_id = $game['winner_team_id'] ?? null;
                         btn.textContent = data.remaining;
                         btn.disabled = data.remaining <= 0;
                     }
-                });
+                }).catch(error => console.error(`Error loading timeouts for team ${teamKey}:`, error));
             });
         }
 
         function finalizeGame() {
-            if (!confirm("Are you sure you want to finalize the game?")) return;
-            fetch('finalize_game.php', {
+            if (gameData.gameStatus === 'Final') return;
+            const scoreA = parseInt(document.getElementById('scoreA').textContent) || 0;
+            const scoreB = parseInt(document.getElementById('scoreB').textContent) || 0;
+            if (scoreA === scoreB) {
+                alert("Cannot finalize: scores are tied.");
+                return;
+            }
+            const winnerTeam = scoreA > scoreB ? gameData.teamA : gameData.teamB;
+            if (!confirm(`Confirm ${winnerTeam.name} as winner?`)) return;
+            fetch('save_winner.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ game_id: gameData.gameId })
-            }).then(res => res.json()).then(data => {
-                if (data.success) {
-                    alert("Game finalized!");
-                    window.location.href = `/league_management_system/game_summary.php?game_id=${gameData.gameId}`;
-                } else {
-                    alert("Failed to finalize game: " + data.error);
+                body: JSON.stringify({
+                    game_id: gameData.gameId,
+                    winner_team_id: winnerTeam.id
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error('Failed to save winner: ' + data.error);
                 }
-            }).catch(err => {
-                alert("Error finalizing game.");
-                console.error(err);
+                gameData.winnerTeamId = winnerTeam.id;
+                return fetch('finalize_game.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ game_id: gameData.gameId })
+                });
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (!data.success) {
+                    throw new Error('Failed to finalize game: ' + data.error);
+                }
+                gameData.gameStatus = 'Final';
+                alert("Game finalized! Winner: " + winnerTeam.name);
+                displayWinner(winnerTeam.id);
+                updateClocksUI();
+            })
+            .catch(err => {
+                console.error("Error finalizing game:", err);
+                alert("An error occurred while finalizing the game.");
             });
         }
 
         function showOverridePanel() {
+            if (gameData.gameStatus === 'Final') return;
             document.getElementById('overridePanel').style.display = 'block';
         }
 
         function saveWinner() {
-    const selected = document.getElementById('winnerSelect').value;
-
-    if (!selected) {
-        alert("Please select a winner.");
-        return;
-    }
-
-    if (selected === 'none') {
-        if (!confirm("Are you sure you want to unset the winner?")) return;
-    }
-
-    const winnerTeam = selected === 'A' ? gameData.teamA :
-                       selected === 'B' ? gameData.teamB : null;
-
-    fetch('save_winner.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            game_id: gameData.gameId,
-            winner_team_id: winnerTeam ? winnerTeam.id : null
-        })
-    })
-    .then(res => res.json())
-    .then(data => {
-        if (data.success) {
-            alert(selected === 'none' ? "Winner unset!" : "Winner saved!");
-            displayWinner(winnerTeam ? winnerTeam.id : null);
-        } else {
-            alert("Failed to save winner: " + (data.error || 'Unknown error.'));
+            if (gameData.gameStatus === 'Final') return;
+            const selected = document.getElementById('winnerSelect').value;
+            if (!selected) {
+                alert("Please select a winner.");
+                return;
+            }
+            if (selected === 'none') {
+                if (!confirm("Are you sure you want to unset the winner?")) return;
+            }
+            const winnerTeam = selected === 'A' ? gameData.teamA :
+                              selected === 'B' ? gameData.teamB : null;
+            fetch('save_winner.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    game_id: gameData.gameId,
+                    winner_team_id: winnerTeam ? winnerTeam.id : null
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(selected === 'none' ? "Winner unset!" : "Winner saved!");
+                    gameData.winnerTeamId = winnerTeam ? winnerTeam.id : null;
+                    displayWinner(winnerTeam ? winnerTeam.id : null);
+                    updateClocksUI();
+                } else {
+                    alert("Failed to save winner: " + (data.error || 'Unknown error.'));
+                }
+            })
+            .catch(err => {
+                console.error("Error overriding winner:", err);
+                alert("An error occurred.");
+            });
         }
-    })
-    .catch(err => {
-        console.error("Error overriding winner:", err);
-        alert("An error occurred.");
-    });
-}
-
 
         function displayWinner(winnerId) {
-            document.querySelectorAll('.winner-label').forEach(el => el.remove());
-            const label = document.createElement('span');
-            label.classList.add('winner-label');
-            label.textContent = '(Winner)';
-            if (winnerId == gameData.teamA.id) {
-                document.getElementById('home-box').prepend(label);
-            } else if (winnerId == gameData.teamB.id) {
-                document.getElementById('away-box').appendChild(label);
-            }
+    document.querySelectorAll('.winner-label').forEach(el => el.remove());
+    if (winnerId) {
+        const label = document.createElement('span');
+        label.classList.add('winner-label');
+        label.textContent = '(Winner)';
+        label.style.visibility = 'visible';
+        if (winnerId == gameData.teamA.id) {
+            document.getElementById('home-box').prepend(label);
+        } else if (winnerId == gameData.teamB.id) {
+            document.getElementById('away-box').appendChild(label);
         }
+    }
+}
 
         window.addEventListener('DOMContentLoaded', () => {
             updateClocksUI();
-            if (clocksRunning) {
+            if (clocksRunning && gameData.gameStatus !== 'Final') {
                 startClocks();
             }
             renderTeam('teamA');
@@ -778,6 +840,7 @@ $winner_team_id = $game['winner_team_id'] ?? null;
             document.querySelectorAll('.timeout-click').forEach(el => {
                 el.style.cursor = 'pointer';
                 el.addEventListener('click', async () => {
+                    if (gameData.gameStatus === 'Final') return;
                     const teamKey = el.dataset.team;
                     const teamId = teamKey === 'A' ? gameData.teamA.id : gameData.teamB.id;
                     if (!confirm(`Use a timeout for ${gameData[teamKey === 'A' ? 'teamA' : 'teamB'].name}?`)) return;
@@ -802,35 +865,32 @@ $winner_team_id = $game['winner_team_id'] ?? null;
         });
 
         function adjustGameClock(delta) {
-            if (!clocksRunning) {
-                const maxTime = quarter <= 4 ? 600 : 300;
-                gameClock = Math.max(0, Math.min(gameClock + delta, maxTime));
-                if (shotClock > gameClock) {
-                    shotClock = gameClock;
-                }
-                updateClocksUI();
-                saveTimerState();
+            if (clocksRunning || gameData.gameStatus === 'Final') return;
+            const maxTime = quarter <= 4 ? 600 : 300;
+            gameClock = Math.max(0, Math.min(gameClock + delta, maxTime));
+            if (shotClock > gameClock) {
+                shotClock = gameClock;
             }
+            updateClocksUI();
+            saveTimerState();
         }
 
         function adjustGameClockMinute(delta) {
-            if (!clocksRunning) {
-                const maxTime = quarter <= 4 ? 600 : 300;
-                gameClock = Math.max(0, Math.min(gameClock + delta * 60, maxTime));
-                if (shotClock > gameClock) {
-                    shotClock = gameClock;
-                }
-                updateClocksUI();
-                saveTimerState();
+            if (clocksRunning || gameData.gameStatus === 'Final') return;
+            const maxTime = quarter <= 4 ? 600 : 300;
+            gameClock = Math.max(0, Math.min(gameClock + delta * 60, maxTime));
+            if (shotClock > gameClock) {
+                shotClock = gameClock;
             }
+            updateClocksUI();
+            saveTimerState();
         }
 
         function adjustShotClock(delta) {
-            if (!clocksRunning) {
-                shotClock = Math.max(0, Math.min(shotClock + delta, Math.min(24, gameClock)));
-                updateClocksUI();
-                saveTimerState();
-            }
+            if (clocksRunning || gameData.gameStatus === 'Final') return;
+            shotClock = Math.max(0, Math.min(shotClock + delta, Math.min(24, gameClock)));
+            updateClocksUI();
+            saveTimerState();
         }
     </script>
 </body>

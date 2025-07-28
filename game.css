@@ -1,237 +1,77 @@
-body { 
-    font-family: Arial, sans-serif; 
-    padding: 20px; 
-}
-
-.teams-container { 
-    display: flex; 
-    justify-content: space-between; 
-    gap: 20px; 
-}
-
-.team-box { 
-    width: 49%; 
-    border: 1px solid #ccc; 
-    border-radius: 8px; 
-    padding: 10px; 
-}
-
-.team-header { 
-    font-weight: bold; 
-    text-align: center; 
-    margin-bottom: 10px; 
-}
-
-.score-line {
+.score-display {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
     align-items: center;
-    font-weight: bold;
-    margin-bottom: 5px;
-}
-
-.score-value {
     font-size: 24px;
     font-weight: bold;
-    color: #333;
-}
-
-table { 
-    width: 100%; 
-    border-collapse: collapse; 
-    font-size: 14px; 
-}
-
-th, td { 
-    border: 1px solid #ddd; 
-    padding: 4px; 
-    text-align: center; 
-    position: relative; 
-}
-
-th { 
-    background-color: #f2f2f2; 
-}
-
-.stat-cell:hover .stat-controls { 
-    display: inline-flex; 
-}
-
-.stat-controls { 
-    display: none; 
-    gap: 4px; 
-    position: absolute; 
-    right: 4px; 
-    top: 2px; 
-}
-
-.stat-controls button { 
-    font-size: 12px; 
-    padding: 1px 5px; 
-}
-
-.jersey-input { 
-    width: 50px; 
-    text-align: center; 
-}
-
-.in-game-checkbox { 
-    cursor: pointer; 
-}
-
-tr:has(.in-game-checkbox:checked) { 
-    background-color: #e0ffe0; 
-}
-
-
-
-.timer-panel {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 10px 0;
-    background-color: #f9f9f9;
-    border-bottom: 1px solid #ddd;
-}
-
-.timer-panel .quarter {
-    font-size: 18px;
-    font-weight: bold;
-    margin-bottom: 5px;
-}
-
-.timer-panel .timers {
-    display: flex;
-    gap: 20px;
-    font-size: 32px;
-    font-weight: bold;
-}
-
-.timer-panel .game-clock,
-.timer-panel .shot-clock {
-    padding: 6px 16px;
-    border: 2px solid #333;
-    border-radius: 6px;
-    background-color: #fff;
-}
-
-.fixed-header {
-    position: sticky;
-    top: 0;
-    background-color: white;
-    padding: 10px 0;
-    z-index: 1000;
-    border-bottom: 2px solid #ddd;
-}
-
-.timers {
-    display: flex;
-    gap: 40px;
-    font-size: 32px;
-    font-weight: bold;
-    align-items: center;
-    justify-content: center;
-}
-
-.clock-control {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.adjust-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.adjust-buttons button {
-    width: 32px;
-    height: 32px;
-    font-size: 20px;
-    line-height: 1;
-    cursor: pointer;
-    border: 1px solid #ccc;
-    background-color: #f2f2f2;
-    border-radius: 4px;
-}
-
-.timeout-click {
-    padding: 4px 10px;
-    font-size: 14px;
-    font-weight: bold;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-
-.timeout-click:hover {
-    background-color: #0056b3;
-}
-
-.timeout-click:disabled {
-    background-color: #999;
-    cursor: not-allowed;
-}
-.name-cell {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 160px;
-  display: inline-block;
-}
-.score-display {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 24px;
-  font-weight: bold;
-  gap: 30px;
-  padding: 12px 0;
-  border-bottom: 1px solid #ccc;
+    gap: 30px;
+    padding: 12px 0;
+    border-bottom: 1px solid #ccc;
 }
 
 .team-name-box {
-  display: flex;
-  align-items: center;
-  min-width: 140px;
+    display: flex;
+    align-items: center;
+    width: 200px; /* Fixed width to accommodate team name + winner label */
+    min-width: 200px;
 }
 
 .team-name-box.left {
-  justify-content: flex-end;
-  gap: 8px; /* Space between label and name */
-  flex-direction: row; /* Label on the left of name */
+    justify-content: flex-end;
+    gap: 8px;
+    flex-direction: row;
 }
 
 .team-name-box.right {
-  justify-content: flex-start;
-  gap: 8px; /* Space between name and label */
-  flex-direction: row; /* Name on left, label on right */
+    justify-content: flex-start;
+    gap: 8px;
+    flex-direction: row;
 }
 
 .winner-label {
-  color: green;
-  font-weight: bold;
-  font-size: 18px;
-  display: inline-block;
-  min-width: 150px; /* enough space for the longest expected winner name */
+    color: green;
+    font-weight: bold;
+    font-size: 18px;
+    display: inline-block;
+    min-width: 50px; /* Reduced to fit '(Winner)' */
+    text-align: center;
 }
 
-
 .team-name {
-  white-space: nowrap;
+    white-space: nowrap;
+    flex-grow: 1;
+    text-align: center;
 }
 
 .score {
-  font-size: 32px;
-  min-width: 40px;
-  text-align: center;
+    font-size: 32px;
+    min-width: 40px;
+    text-align: center;
 }
 
 .separator {
-  font-size: 28px;
-  padding: 0 10px;
+    font-size: 28px;
+    padding: 0 10px;
+}
+
+/* Responsive adjustment for smaller screens */
+@media (max-width: 600px) {
+    .team-name-box {
+        width: 120px;
+        min-width: 120px;
+    }
+    .winner-label {
+        font-size: 16px;
+        min-width: 40px;
+    }
+    .score-display {
+        gap: 15px;
+        font-size: 20px;
+    }
+    .score {
+        font-size: 28px;
+    }
+    .separator {
+        font-size: 24px;
+    }
 }
