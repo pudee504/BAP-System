@@ -290,6 +290,7 @@ $winner_team_id = $game['winner_team_id'] ?? null;
                 <option value="">-- Select --</option>
                 <option value="A"><?php echo htmlspecialchars($game['home_team_name']); ?></option>
                 <option value="B"><?php echo htmlspecialchars($game['away_team_name']); ?></option>
+                <option value="none">None</option>
             </select>
         </label>
         <button onclick="saveWinner()">Save Winner</button>
@@ -712,35 +713,43 @@ $winner_team_id = $game['winner_team_id'] ?? null;
         }
 
         function saveWinner() {
-            const selected = document.getElementById('winnerSelect').value;
-            if (!selected) {
-                alert("Please select a winner.");
-                return;
-            }
-            const winnerTeam = selected === 'A' ? gameData.teamA : gameData.teamB;
-            if (!confirm(`Confirm ${winnerTeam.name} as winner?`)) return;
-            fetch('save_winner.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    game_id: gameData.gameId,
-                    winner_team_id: winnerTeam.id
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.success) {
-                    alert("Winner saved!");
-                    displayWinner(winnerTeam.id);
-                } else {
-                    alert("Failed to save winner.");
-                }
-            })
-            .catch(err => {
-                console.error("Error overriding winner:", err);
-                alert("An error occurred.");
-            });
+    const selected = document.getElementById('winnerSelect').value;
+
+    if (!selected) {
+        alert("Please select a winner.");
+        return;
+    }
+
+    if (selected === 'none') {
+        if (!confirm("Are you sure you want to unset the winner?")) return;
+    }
+
+    const winnerTeam = selected === 'A' ? gameData.teamA :
+                       selected === 'B' ? gameData.teamB : null;
+
+    fetch('save_winner.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            game_id: gameData.gameId,
+            winner_team_id: winnerTeam ? winnerTeam.id : null
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            alert(selected === 'none' ? "Winner unset!" : "Winner saved!");
+            displayWinner(winnerTeam ? winnerTeam.id : null);
+        } else {
+            alert("Failed to save winner: " + (data.error || 'Unknown error.'));
         }
+    })
+    .catch(err => {
+        console.error("Error overriding winner:", err);
+        alert("An error occurred.");
+    });
+}
+
 
         function displayWinner(winnerId) {
             document.querySelectorAll('.winner-label').forEach(el => el.remove());
