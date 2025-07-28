@@ -1,17 +1,25 @@
 <?php
 session_start();
-$active_tab = $_GET['tab'] ?? 'teams';
-
 require 'includes/category_info.php';
 
-// NEW: check if schedule is already generated
+// Validate category ID
+$category_id = $_GET['category_id'] ?? '';
+if (!$category_id) {
+    die("Invalid category ID.");
+}
+
+// Determine active tab (default to 'teams')
+$active_tab = $_GET['tab'] ?? 'teams';
+$valid_tabs = ['teams', 'schedule', 'standings'];
+if (!in_array($active_tab, $valid_tabs)) {
+    $active_tab = 'teams';
+}
+
+// Check if schedule is generated
 $check = $pdo->prepare("SELECT schedule_generated FROM category WHERE id = ?");
 $check->execute([$category_id]);
-$scheduleInfo = $check->fetch();
-$scheduleGenerated = $scheduleInfo['schedule_generated'];
-
-$active_tab = $_GET['tab'] ?? 'teams';
-
+$scheduleInfo = $check->fetch(PDO::FETCH_ASSOC);
+$scheduleGenerated = $scheduleInfo['schedule_generated'] ?? false;
 ?>
 
 <!DOCTYPE html>
@@ -21,7 +29,6 @@ $active_tab = $_GET['tab'] ?? 'teams';
   <title>Category Details</title>
   <?php include 'includes/head_styles.php'; ?>
 </head>
-
 <body>
 <?php include 'includes/header.php'; ?>
 <div class="dashboard-container">
@@ -29,24 +36,31 @@ $active_tab = $_GET['tab'] ?? 'teams';
   <p><strong>Format:</strong> <?= htmlspecialchars($category['format_name']) ?></p>
   <p><strong>Number of Teams:</strong> <?= $category['num_teams'] ?></p>
   
-  
   <?php if ($category['num_groups']): ?>
     <p><strong>Groups:</strong> <?= $category['num_groups'] ?> (<?= $category['advance_per_group'] ?> advance per group)</p>
   <?php endif; ?>
 
   <?php include 'includes/category_tabs.php'; ?>
-  <?php include 'includes/category_tabs_teams.php'; ?>
-  <?php include 'includes/category_tabs_schedule.php'; ?>
-  <?php include 'includes/category_tabs_standings.php'; ?>
+  <div class="tab-container">
+    <?php include 'includes/category_tabs_teams.php'; ?>
+    <?php include 'includes/category_tabs_schedule.php'; ?>
+    <?php include 'includes/category_tabs_standings.php'; ?>
+  </div>
+</div>
 
 <script>
 document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
+  tab.addEventListener('click', (e) => {
+    e.preventDefault();
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
-
     tab.classList.add('active');
-    document.getElementById(tab.getAttribute('data-tab')).classList.add('active');
+    const tabId = tab.getAttribute('data-tab');
+    document.getElementById(tabId).classList.add('active');
+    // Update URL without reloading
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tabId);
+    window.history.pushState({}, '', url);
   });
 });
 
@@ -83,14 +97,13 @@ function moveToCluster(selectElem, teamId) {
     }
   });
 }
-</script>
-<script>
+
 function toggleDateForm(gameId) {
   const form = document.getElementById('date-form-' + gameId);
-  form.style.display = (form.style.display === 'none') ? 'block' : 'none';
+  if (form) {
+    form.style.display = (form.style.display === 'none') ? 'block' : 'none';
+  }
 }
 </script>
-
-
 </body>
 </html>

@@ -111,7 +111,7 @@ $stmt->execute([$game_id, $game['awayteam_id'], $game['awayteam_id']]);
 $away_players = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Update game status if not finalized
-$pdo->prepare("UPDATE game SET game_status = 'Active' WHERE id = ? AND game_status != 'Final'")->execute([$game_id]);
+$pdo->prepare("UPDATE game SET game_status = 'Active' WHERE id = ? AND game_status != 'Completed'")->execute([$game_id]);
 
 // Helper functions
 function getCurrentHalf($quarter) {
@@ -169,7 +169,7 @@ if ($timeoutsB === null) {
 
 $foulsA = loadTeamFouls($pdo, $game_id, $game['hometeam_id'], $quarter_id);
 $foulsB = loadTeamFouls($pdo, $game_id, $game['awayteam_id'], $quarter_id);
-$winner_team_id = $game['winner_team_id'] ?? null;
+$winnerteam_id = $game['winnerteam_id'] ?? null;
 ?>
 
 <!DOCTYPE html>
@@ -182,22 +182,22 @@ $winner_team_id = $game['winner_team_id'] ?? null;
 </head>
 <body>
     <div class="score-display">
-    <div class="team-name-box left" id="home-box">
-        <span class="winner-label" style="<?php echo ($game['winnerteam_id'] == $game['hometeam_id']) ? 'visibility:visible;' : 'visibility:hidden;'; ?>">
-            (Winner)
-        </span>
-        <span class="team-name"><?php echo htmlspecialchars($game['home_team_name']); ?></span>
+        <div class="team-name-box left" id="home-box">
+            <span class="winner-label" style="<?php echo ($game['winnerteam_id'] == $game['hometeam_id']) ? 'visibility:visible;' : 'visibility:hidden;'; ?>">
+                (Winner)
+            </span>
+            <span class="team-name"><?php echo htmlspecialchars($game['home_team_name']); ?></span>
+        </div>
+        <span class="score" id="scoreA"><?php echo $game['hometeam_score']; ?></span>
+        <span class="separator">—</span>
+        <span class="score" id="scoreB"><?php echo $game['awayteam_score']; ?></span>
+        <div class="team-name-box right" id="away-box">
+            <span class="team-name"><?php echo htmlspecialchars($game['away_team_name']); ?></span>
+            <span class="winner-label" style="<?php echo ($game['winnerteam_id'] == $game['awayteam_id']) ? 'visibility:visible;' : 'visibility:hidden;'; ?>">
+                (Winner)
+            </span>
+        </div>
     </div>
-    <span class="score" id="scoreA"><?php echo $game['hometeam_score']; ?></span>
-    <span class="separator">—</span>
-    <span class="score" id="scoreB"><?php echo $game['awayteam_score']; ?></span>
-    <div class="team-name-box right" id="away-box">
-        <span class="team-name"><?php echo htmlspecialchars($game['away_team_name']); ?></span>
-        <span class="winner-label" style="<?php echo ($game['winnerteam_id'] == $game['awayteam_id']) ? 'visibility:visible;' : 'visibility:hidden;'; ?>">
-            (Winner)
-        </span>
-    </div>
-</div>
 
     <div class="timer-panel">
         <div class="quarter" id="quarterLabel">1st Quarter</div>
@@ -309,7 +309,7 @@ $winner_team_id = $game['winner_team_id'] ?? null;
                 name: <?php echo json_encode($game['away_team_name']); ?>,
                 players: <?php echo json_encode($away_players); ?>
             },
-            winnerTeamId: <?php echo json_encode($game['winner_team_id'] ?? null); ?>,
+            winnerTeamId: <?php echo json_encode($game['winnerteam_id'] ?? null); ?>,
             gameStatus: <?php echo json_encode($game['game_status'] ?? 'Active'); ?>
         };
 
@@ -737,7 +737,7 @@ $winner_team_id = $game['winner_team_id'] ?? null;
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     game_id: gameData.gameId,
-                    winner_team_id: winnerTeam.id
+                    winnerteam_id: winnerTeam.id
                 })
             })
             .then(res => res.json())
@@ -790,7 +790,7 @@ $winner_team_id = $game['winner_team_id'] ?? null;
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     game_id: gameData.gameId,
-                    winner_team_id: winnerTeam ? winnerTeam.id : null
+                    winnerteam_id: winnerTeam ? winnerTeam.id : null
                 })
             })
             .then(res => res.json())
@@ -811,19 +811,19 @@ $winner_team_id = $game['winner_team_id'] ?? null;
         }
 
         function displayWinner(winnerId) {
-    document.querySelectorAll('.winner-label').forEach(el => el.remove());
-    if (winnerId) {
-        const label = document.createElement('span');
-        label.classList.add('winner-label');
-        label.textContent = '(Winner)';
-        label.style.visibility = 'visible';
-        if (winnerId == gameData.teamA.id) {
-            document.getElementById('home-box').prepend(label);
-        } else if (winnerId == gameData.teamB.id) {
-            document.getElementById('away-box').appendChild(label);
+            document.querySelectorAll('.winner-label').forEach(el => el.remove());
+            if (winnerId) {
+                const label = document.createElement('span');
+                label.classList.add('winner-label');
+                label.textContent = '(Winner)';
+                label.style.visibility = 'visible';
+                if (winnerId == gameData.teamA.id) {
+                    document.getElementById('home-box').prepend(label);
+                } else if (winnerId == gameData.teamB.id) {
+                    document.getElementById('away-box').appendChild(label);
+                }
+            }
         }
-    }
-}
 
         window.addEventListener('DOMContentLoaded', () => {
             updateClocksUI();
