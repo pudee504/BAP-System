@@ -2,7 +2,6 @@
   <h2>Schedule</h2>
 
   <?php
-  // Debug: Log inclusion
   error_log("category_tabs_schedule.php: Loaded for category_id=$category_id, scheduleGenerated=$scheduleGenerated");
   ?>
 
@@ -71,29 +70,29 @@
             <td><?= $index + 1 ?></td>
             <td><?= htmlspecialchars($game['round_name'] ?: 'Round ' . $game['round']) ?></td>
             <td class="match-cell">
-  <div class="match-grid">
-    <div class="team-name">
-      <?= $game['hometeam_id'] ? '<a href="team_details.php?team_id=' . $game['hometeam_id'] . '">' . htmlspecialchars($game['home_name']) . '</a>' : 'TBD' ?>
-    </div>
-    <div class="team-result <?= $game['winnerteam_id'] && ($game['game_status'] === 'Completed' || !$game['game_status']) ? ($game['hometeam_id'] == $game['winnerteam_id'] ? 'win' : 'loss') : '' ?>">
-      <?php if ($game['winnerteam_id'] && ($game['game_status'] === 'Completed' || !$game['game_status'])): ?>
-        <?= ($game['hometeam_id'] == $game['winnerteam_id']) ? 'W' : 'L' ?>
-      <?php else: ?>
-        -
-      <?php endif; ?>
-    </div>
-    <div class="team-name">
-      <?= $game['awayteam_id'] ? '<a href="team_details.php?team_id=' . $game['awayteam_id'] . '">' . htmlspecialchars($game['away_name']) . '</a>' : 'TBD' ?>
-    </div>
-    <div class="team-result <?= $game['winnerteam_id'] && ($game['game_status'] === 'Completed' || !$game['game_status']) ? ($game['awayteam_id'] == $game['winnerteam_id'] ? 'win' : 'loss') : '' ?>">
-      <?php if ($game['winnerteam_id'] && ($game['game_status'] === 'Completed' || !$game['game_status'])): ?>
-        <?= ($game['awayteam_id'] == $game['winnerteam_id']) ? 'W' : 'L' ?>
-      <?php else: ?>
-        -
-      <?php endif; ?>
-    </div>
-  </div>
-</td>
+              <div class="match-grid">
+                <div class="team-name">
+                  <?= $game['hometeam_id'] ? '<a href="team_details.php?team_id=' . $game['hometeam_id'] . '">' . htmlspecialchars($game['home_name']) . '</a>' : 'TBD' ?>
+                </div>
+                <div class="team-result <?= $game['winnerteam_id'] && ($game['game_status'] === 'Completed' || !$game['game_status']) ? ($game['hometeam_id'] == $game['winnerteam_id'] ? 'win' : 'loss') : '' ?>">
+                  <?php if ($game['winnerteam_id'] && ($game['game_status'] === 'Completed' || !$game['game_status'])): ?>
+                    <?= ($game['hometeam_id'] == $game['winnerteam_id']) ? 'W' : 'L' ?>
+                  <?php else: ?>
+                    -
+                  <?php endif; ?>
+                </div>
+                <div class="team-name">
+                  <?= $game['awayteam_id'] ? '<a href="team_details.php?team_id=' . $game['awayteam_id'] . '">' . htmlspecialchars($game['away_name']) . '</a>' : 'TBD' ?>
+                </div>
+                <div class="team-result <?= $game['winnerteam_id'] && ($game['game_status'] === 'Completed' || !$game['game_status']) ? ($game['awayteam_id'] == $game['winnerteam_id'] ? 'win' : 'loss') : '' ?>">
+                  <?php if ($game['winnerteam_id'] && ($game['game_status'] === 'Completed' || !$game['game_status'])): ?>
+                    <?= ($game['awayteam_id'] == $game['winnerteam_id']) ? 'W' : 'L' ?>
+                  <?php else: ?>
+                    -
+                  <?php endif; ?>
+                </div>
+              </div>
+            </td>
             <td>
               <?php
               if ($game['game_status'] === 'Completed' || ($game['winnerteam_id'] && !$game['game_status'])) {
@@ -108,7 +107,7 @@
               ?>
             </td>
             <td id="game-date-<?= $game['id'] ?>">
-              <?php if ($game['game_date'] && $game['game_date'] !== '0000-00-00 00:00'): ?>
+              <?php if ($game['game_date'] && $game['game_date'] !== '0000-00-00 00:00:00'): ?>
                 <?= date("F j, Y g A", strtotime($game['game_date'])) ?>
               <?php else: ?>
                 <span style="color: red;">None</span>
@@ -122,7 +121,7 @@
                 <input type="datetime-local" name="game_date" required>
                 <button type="submit">Save</button>
               </form>
-              <?php if ($game['game_date'] && $game['game_date'] !== '0000-00-00 00:00'): ?>
+              <?php if ($game['game_date'] && $game['game_date'] !== '0000-00-00 00:00:00'): ?>
                 <form action="manage_game.php" method="GET" style="display:inline;">
                   <input type="hidden" name="game_id" value="<?= $game['id'] ?>">
                   <input type="hidden" name="category_id" value="<?= $category_id ?>">
