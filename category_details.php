@@ -26,6 +26,20 @@ $lockStmt = $pdo->prepare("SELECT is_locked FROM category_format WHERE category_
 $lockStmt->execute([$category_id]);
 $lockInfo = $lockStmt->fetch(PDO::FETCH_ASSOC);
 $seedingsLocked = $lockInfo['is_locked'] ?? false;
+
+$hasFinalGames = false;
+if ($scheduleGenerated) {
+    // This query now checks for a 'Final' status OR a set winner ID
+    $finalCheck = $pdo->prepare("
+        SELECT COUNT(*) 
+        FROM game 
+        WHERE category_id = ? AND (game_status = 'Final' OR winnerteam_id IS NOT NULL)
+    ");
+    $finalCheck->execute([$category_id]);
+    if ($finalCheck->fetchColumn() > 0) {
+        $hasFinalGames = true;
+    }
+}
 ?>
 
 <!DOCTYPE html>

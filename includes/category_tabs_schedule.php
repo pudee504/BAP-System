@@ -6,53 +6,45 @@
   error_log("category_tabs_schedule.php: Loaded for category_id=$category_id, scheduleGenerated=$scheduleGenerated");
   ?>
 
-  <?php if ($category['format_name'] === 'Single Elimination'): ?>
-    <?php if (!$scheduleGenerated): ?>
-      <?php if ($seedingsLocked): ?>
-        <form action="single_elimination.php" method="POST" onsubmit="return confirm('This will generate a full single elimination bracket. Proceed?')">
-          <input type="hidden" name="category_id" value="<?= $category_id ?>">
-          <button type="submit">Generate Single Elimination Schedule</button>
-        </form>
-      <?php else: ?>
-        <button type="submit" disabled>Generate Single Elimination Schedule</button>
-        <p style="color: red; font-size: 0.9em; margin-top: 5px;">You must lock the team seedings in the 'Teams' tab before generating a schedule.</p>
-      <?php endif; ?>
+  <?php if (!$scheduleGenerated): ?>
+    <?php // --- SCHEDULE IS NOT GENERATED --- ?>
+    <?php if ($seedingsLocked): ?>
+      <?php // Determine which generation script to use based on format
+      $action_url = '';
+      if ($category['format_name'] === 'Single Elimination') $action_url = 'single_elimination.php';
+      if ($category['format_name'] === 'Double Elimination') $action_url = 'double_elimination.php';
+      if ($category['format_name'] === 'Round Robin') $action_url = 'round_robin.php';
+      ?>
+      <form action="<?= $action_url ?>" method="POST" onsubmit="return confirm('This will generate a full <?= strtolower($category['format_name']) ?> bracket. Proceed?')">
+        <input type="hidden" name="category_id" value="<?= $category_id ?>">
+        <button type="submit">Generate <?= $category['format_name'] ?> Schedule</button>
+      </form>
     <?php else: ?>
-      <p style="color: green;"><strong>Schedule already generated.</strong></p>
+      <button type="submit" disabled>Generate Schedule</button>
+      <p style="color: red; font-size: 0.9em; margin-top: 5px;">You must lock the team seedings in the 'Teams' tab before generating a schedule.</p>
+    <?php endif; ?>
+
+  <?php else: ?>
+    <?php // --- SCHEDULE IS ALREADY GENERATED --- ?>
+    <p style="color: green;"><strong>Schedule already generated.</strong></p>
+
+    <?php if ($hasFinalGames): ?>
+      <?php // Cannot regenerate because games are final ?>
+      <button disabled style="background-color: #6c757d;">Regenerate Schedule</button>
+      <p style="color: red; font-size: 0.9em; margin-top: 5px;">
+        Cannot regenerate schedule because at least one game has a 'Final' status.
+        <br>
+        If major changes are required, it is recommended to create a new category.
+      </p>
+    <?php else: ?>
+      <?php // Can regenerate because no games are final ?>
+      <form action="clear_schedule.php" method="POST" onsubmit="return confirm('WARNING: This will delete all existing games and allow you to generate a new schedule. This action cannot be undone. Proceed?')">
+        <input type="hidden" name="category_id" value="<?= $category_id ?>">
+        <button type="submit" style="background-color: #dc3545; color: white;">Regenerate Schedule</button>
+      </form>
     <?php endif; ?>
   <?php endif; ?>
 
-  <?php if ($category['format_name'] === 'Double Elimination'): ?>
-    <?php if (!$scheduleGenerated): ?>
-      <?php if ($seedingsLocked): ?>
-        <form action="double_elimination.php" method="POST" onsubmit="return confirm('This will generate a full double elimination bracket. Proceed?')">
-          <input type="hidden" name="category_id" value="<?= $category_id ?>">
-          <button type="submit">Generate Double Elimination Schedule</button>
-        </form>
-      <?php else: ?>
-        <button type="submit" disabled>Generate Double Elimination Schedule</button>
-        <p style="color: red; font-size: 0.9em; margin-top: 5px;">You must lock the team seedings in the 'Teams' tab before generating a schedule.</p>
-      <?php endif; ?>
-    <?php else: ?>
-      <p style="color: green;"><strong>Schedule already generated.</strong></p>
-    <?php endif; ?>
-  <?php endif; ?>
-
-  <?php if ($category['format_name'] === 'Round Robin'): ?>
-    <?php if (!$scheduleGenerated): ?>
-      <?php if ($seedingsLocked): ?>
-        <form action="round_robin.php" method="POST" onsubmit="return confirm('This will generate a full round robin bracket. Proceed?')">
-          <input type="hidden" name="category_id" value="<?= $category_id ?>">
-          <button type="submit">Generate Round Robin Schedule</button>
-        </form>
-      <?php else: ?>
-        <button type="submit" disabled>Generate Round Robin Schedule</button>
-        <p style="color: red; font-size: 0.9em; margin-top: 5px;">You must lock the team seedings in the 'Teams' tab before generating a schedule.</p>
-      <?php endif; ?>
-    <?php else: ?>
-      <p style="color: green;"><strong>Schedule already generated.</strong></p>
-    <?php endif; ?>
-  <?php endif; ?>
 
   <?php
   $schedule = $pdo->prepare("
