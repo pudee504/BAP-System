@@ -20,6 +20,12 @@ $check = $pdo->prepare("SELECT schedule_generated FROM category WHERE id = ?");
 $check->execute([$category_id]);
 $scheduleInfo = $check->fetch(PDO::FETCH_ASSOC);
 $scheduleGenerated = $scheduleInfo['schedule_generated'] ?? false;
+
+// This query should ideally be combined with the one in 'category_info.php' for efficiency.
+$lockStmt = $pdo->prepare("SELECT is_locked FROM category_format WHERE category_id = ?");
+$lockStmt->execute([$category_id]);
+$lockInfo = $lockStmt->fetch(PDO::FETCH_ASSOC);
+$seedingsLocked = $lockInfo['is_locked'] ?? false;
 ?>
 
 <!DOCTYPE html>

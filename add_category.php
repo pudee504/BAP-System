@@ -23,14 +23,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("Invalid input. Please go back and fill in all required fields.");
     }
     
-    // --- Server-side check for Double Elimination ---
-    if ($format_id === 2 && $num_teams < 4) { // Assuming '2' is the ID for Double Elimination
-        $error = "Double Elimination format requires a minimum of 4 teams.";
+    // --- MODIFIED: Server-side check for Elimination Formats ---
+    if (($format_id === 1 || $format_id === 2) && $num_teams < 4) {
+        $format_name = ($format_id === 1) ? 'Single Elimination' : 'Double Elimination';
+        $error = "{$format_name} format requires a minimum of 4 teams.";
         log_action('ADD_CATEGORY', 'FAILURE', "Validation failed for '{$category_name}'. Reason: {$error}");
         die("Invalid input: {$error}");
     }
 
-    // --- CORRECTED: Round Robin Specific Validation ---
+    // --- Round Robin Specific Validation ---
     if ($format_id === 3) {
         $num_groups = (int) ($_POST['num_groups'] ?? 0);
         $advance_per_group = (int) ($_POST['advance_per_group'] ?? 0);
@@ -51,11 +52,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($min_teams_per_group < 2) {
                 $error = "Each group must have at least 2 teams. Your setup results in some groups having only {$min_teams_per_group} team(s).";
             } 
-            // FIXED: Changed '>=' to '>'. You can now advance a number of teams EQUAL to the smallest group size.
             elseif ($advance_per_group > $min_teams_per_group) {
                 $error = "Cannot advance {$advance_per_group} teams when the smallest group only has {$min_teams_per_group} teams.";
             }
-            // NEW: Check that the next round isn't the same size or bigger than the current one.
             elseif (($num_groups * $advance_per_group) >= $num_teams) {
                 $total_advancing = $num_groups * $advance_per_group;
                 $error = "Invalid setup: The total number of advancing teams ({$total_advancing}) must be less than the total number of teams ({$num_teams}).";
@@ -146,8 +145,7 @@ $league_id = (int) $_GET['league_id'];
       <div id="dropdownTeams" style="display:none;">
         <label for="numTeamsSelect">Number of Teams</label>
         <select name="num_teams_dropdown" id="numTeamsSelect">
-          <option value="">-- Select Teams --</option>
-          <option value="2">2</option>
+          <option value="">-- Number of Teams --</option>
           <option value="4">4</option>
           <option value="8">8</option>
           <option value="16">16</option>
@@ -185,25 +183,24 @@ $league_id = (int) $_GET['league_id'];
       const dropdownSelect = document.getElementById('numTeamsSelect');
       const optionForTwoTeams = dropdownSelect.querySelector('option[value="2"]');
 
-      if (format === '1' || format === '2') {
+      // --- MODIFIED SCRIPT ---
+      if (format === '1' || format === '2') { // Single or Double Elimination
         dropdown.style.display = 'block';
         custom.style.display = 'none';
         roundOptions.style.display = 'none';
 
-        if (format === '2') { // Assuming '2' is Double Elimination
-          optionForTwoTeams.style.display = 'none';
-          if (dropdownSelect.value === '2') {
-            dropdownSelect.value = '';
-          }
-        } else {
-          optionForTwoTeams.style.display = 'block';
+        // Hide the "2 teams" option for these formats
+        optionForTwoTeams.style.display = 'none';
+        
+        // If "2" was selected, reset the dropdown to prevent submitting a hidden value
+        if (dropdownSelect.value === '2') {
+          dropdownSelect.value = '';
         }
-
-      } else if (format === '3') {
+      } else if (format === '3') { // Round Robin
         dropdown.style.display = 'none';
         custom.style.display = 'block';
         roundOptions.style.display = 'block';
-      } else {
+      } else { // No format selected
         dropdown.style.display = 'none';
         custom.style.display = 'none';
         roundOptions.style.display = 'none';
