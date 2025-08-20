@@ -25,130 +25,145 @@ try {
     $teams = $stmt->fetchAll(PDO::FETCH_COLUMN);
     $total_teams = count($teams);
 
-    // New validation: team count must be a power of 2
-    if ($total_teams < 4 || ($total_teams & ($total_teams - 1)) !== 0) {
+    // This script currently supports 4 or 8 teams
+    if (!in_array($total_teams, [4, 8])) {
         $pdo->rollBack();
-        die("Error: Team count must be a power of 2 (4, 8, 16, or 32).");
+        die("Only 4 or 8 teams are supported for this double-elimination script.");
     }
 
     // Clear any old games for this category
     $pdo->prepare("DELETE FROM game WHERE category_id = ?")->execute([$category_id]);
 
-    // Reusable insert statement
+    // Prepare a reusable insert statement
     $insertGameStmt = $pdo->prepare(
         "INSERT INTO game (category_id, round_name, hometeam_id, awayteam_id, game_status)
          VALUES (?, ?, ?, ?, 'Upcoming')"
     );
 
-    // --- STEP 1: Programmatically Create All Game Placeholders ---
+    // =================================================================
+    //  BRACKET LOGIC FOR 4 TEAMS
+    // =================================================================
+    if ($total_teams == 4) {
+        // --- STEP 1: Create all 6 games and get their IDs ---
+        $insertGameStmt->execute([$category_id, "Upper Semifinal 1", $teams[0], $teams[1]]);
+        $ub_semi1_id = $pdo->lastInsertId();
 
-    $ub_games = []; // To store IDs of upper bracket games, organized by round
-    $lb_games = []; // To store IDs of lower bracket games
+        $insertGameStmt->execute([$category_id, "Upper Semifinal 2", $teams[2], $teams[3]]);
+        $ub_semi2_id = $pdo->lastInsertId();
+        
+        $insertGameStmt->execute([$category_id, "Lower Semifinal", null, null]);
+        $lb_semi_id = $pdo->lastInsertId();
+
+        $insertGameStmt->execute([$category_id, "Upper Final", null, null]);
+        $ub_final_id = $pdo->lastInsertId();
+
+        $insertGameStmt->execute([$category_id, "Lower Final", null, null]);
+        $lb_final_id = $pdo->lastInsertId();
+
+        $insertGameStmt->execute([$category_id, "Grand Final", null, null]);
+        $grand_final_id = $pdo->lastInsertId();
+
+        // --- STEP 2: Link the bracket using the IDs ---
+        $updateStmt = $pdo->prepare(
+            "UPDATE game SET 
+                winner_advances_to_game_id = :win_game, winner_advances_to_slot = :win_slot,
+                loser_advances_to_game_id = :lose_game, loser_advances_to_slot = :lose_slot
+             WHERE id = :game_id"
+        );
+
+        // Link Upper Semifinal 1
+        $updateStmt->execute(['win_game' => $ub_final_id, 'win_slot' => 'home', 'lose_game' => $lb_semi_id, 'lose_slot' => 'home', 'game_id' => $ub_semi1_id]);
+        
+        // Link Upper Semifinal 2
+        $updateStmt->execute(['win_game' => $ub_final_id, 'win_slot' => 'away', 'lose_game' => $lb_semi_id, 'lose_slot' => 'away', 'game_id' => $ub_semi2_id]);
+        
+        // Link Lower Semifinal
+        $updateStmt->execute(['win_game' => $lb_final_id, 'win_slot' => 'away', 'lose_game' => null, 'lose_slot' => null, 'game_id' => $lb_semi_id]);
+        
+        // Link Upper Final
+        $updateStmt->execute(['win_game' => $grand_final_id, 'win_slot' => 'home', 'lose_game' => $lb_final_id, 'lose_slot' => 'home', 'game_id' => $ub_final_id]);
+        
+        // Link Lower Final
+        $updateStmt->execute(['win_game' => $grand_final_id, 'win_slot' => 'away', 'lose_game' => null, 'lose_slot' => null, 'game_id' => $lb_final_id]);
+    }
+    // =================================================================
+    //  BRACKET LOGIC FOR 8 TEAMS
+    // =================================================================
+    elseif ($total_teams == 8) {
+        // --- STEP 1: Create all 14 games and get their IDs ---
+        // Upper Bracket
+        $insertGameStmt->execute([$category_id, "Upper Quarterfinal 1", $teams[0], $teams[1]]); $ub_qf1_id = $pdo->lastInsertId();
+        $insertGameStmt->execute([$category_id, "Upper Quarterfinal 2", $teams[2], $teams[3]]); $ub_qf2_id = $pdo->lastInsertId();
+        $insertGameStmt->execute([$category_id, "Upper Quarterfinal 3", $teams[4], $teams[5]]); $ub_qf3_id = $pdo->lastInsertId();
+        $insertGameStmt->execute([$category_id, "Upper Quarterfinal 4", $teams[6], $teams[7]]); $ub_qf4_id = $pdo->lastInsertId();
+        
+        $insertGameStmt->execute([$category_id, "Upper Semifinal 1", null, null]); $ub_sf1_id = $pdo->lastInsertId();
+        $insertGameStmt->execute([$category_id, "Upper Semifinal 2", null, null]); $ub_sf2_id = $pdo->lastInsertId();
+        
+        $insertGameStmt->execute([$category_id, "Upper Final", null, null]); $ub_final_id = $pdo->lastInsertId();
+
+        // Lower Bracket
+        $insertGameStmt->execute([$category_id, "Lower Round 1, Game 1", null, null]); $lb_r1_g1_id = $pdo->lastInsertId();
+        $insertGameStmt->execute([$category_id, "Lower Round 1, Game 2", null, null]); $lb_r1_g2_id = $pdo->lastInsertId();
+
+        $insertGameStmt->execute([$category_id, "Lower Round 2, Game 1", null, null]); $lb_r2_g1_id = $pdo->lastInsertId();
+        $insertGameStmt->execute([$category_id, "Lower Round 2, Game 2", null, null]); $lb_r2_g2_id = $pdo->lastInsertId();
+        
+        $insertGameStmt->execute([$category_id, "Lower Semifinal", null, null]); $lb_semi_id = $pdo->lastInsertId();
+        $insertGameStmt->execute([$category_id, "Lower Final", null, null]); $lb_final_id = $pdo->lastInsertId();
+
+        // Grand Final
+        $insertGameStmt->execute([$category_id, "Grand Final", null, null]); $grand_final_id = $pdo->lastInsertId();
+
+        // --- STEP 2: Link the bracket using the IDs ---
+        $updateStmt = $pdo->prepare(
+            "UPDATE game SET 
+                winner_advances_to_game_id = :win_game, winner_advances_to_slot = :win_slot,
+                loser_advances_to_game_id = :lose_game, loser_advances_to_slot = :lose_slot
+             WHERE id = :game_id"
+        );
+
+        // Link Upper Quarterfinals
+        $updateStmt->execute(['win_game' => $ub_sf1_id, 'win_slot' => 'home', 'lose_game' => $lb_r1_g1_id, 'lose_slot' => 'home', 'game_id' => $ub_qf1_id]);
+        $updateStmt->execute(['win_game' => $ub_sf1_id, 'win_slot' => 'away', 'lose_game' => $lb_r1_g1_id, 'lose_slot' => 'away', 'game_id' => $ub_qf2_id]);
+        $updateStmt->execute(['win_game' => $ub_sf2_id, 'win_slot' => 'home', 'lose_game' => $lb_r1_g2_id, 'lose_slot' => 'home', 'game_id' => $ub_qf3_id]);
+        $updateStmt->execute(['win_game' => $ub_sf2_id, 'win_slot' => 'away', 'lose_game' => $lb_r1_g2_id, 'lose_slot' => 'away', 'game_id' => $ub_qf4_id]);
+        
+        // Link Upper Semifinals
+        $updateStmt->execute(['win_game' => $ub_final_id, 'win_slot' => 'home', 'lose_game' => $lb_r2_g1_id, 'lose_slot' => 'away', 'game_id' => $ub_sf1_id]);
+        $updateStmt->execute(['win_game' => $ub_final_id, 'win_slot' => 'away', 'lose_game' => $lb_r2_g2_id, 'lose_slot' => 'away', 'game_id' => $ub_sf2_id]);
+
+        // Link Upper Final
+        $updateStmt->execute(['win_game' => $grand_final_id, 'win_slot' => 'home', 'lose_game' => $lb_final_id, 'lose_slot' => 'home', 'game_id' => $ub_final_id]);
+        
+        // Link Lower Bracket Round 1
+        $updateStmt->execute(['win_game' => $lb_r2_g1_id, 'win_slot' => 'home', 'lose_game' => null, 'lose_slot' => null, 'game_id' => $lb_r1_g1_id]);
+        $updateStmt->execute(['win_game' => $lb_r2_g2_id, 'win_slot' => 'home', 'lose_game' => null, 'lose_slot' => null, 'game_id' => $lb_r1_g2_id]);
+        
+        // Link Lower Bracket Round 2
+        $updateStmt->execute(['win_game' => $lb_semi_id, 'win_slot' => 'home', 'lose_game' => null, 'lose_slot' => null, 'game_id' => $lb_r2_g1_id]);
+        $updateStmt->execute(['win_game' => $lb_semi_id, 'win_slot' => 'away', 'lose_game' => null, 'lose_slot' => null, 'game_id' => $lb_r2_g2_id]);
+        
+        // Link Lower Semifinal
+        $updateStmt->execute(['win_game' => $lb_final_id, 'win_slot' => 'away', 'lose_game' => null, 'lose_slot' => null, 'game_id' => $lb_semi_id]);
+
+        // Link Lower Final
+        $updateStmt->execute(['win_game' => $grand_final_id, 'win_slot' => 'away', 'lose_game' => null, 'lose_slot' => null, 'game_id' => $lb_final_id]);
+    }
     
-    $total_ub_rounds = log($total_teams, 2);
-
-    // 1A: Create Upper Bracket games
-    for ($round = 1; $round <= $total_ub_rounds; $round++) {
-        $ub_games[$round] = [];
-        $num_games_in_round = $total_teams / pow(2, $round);
-        for ($i = 0; $i < $num_games_in_round; $i++) {
-            $hometeam = null;
-            $awayteam = null;
-            if ($round === 1) { // Assign teams only in the first round
-                $hometeam = $teams[$i];
-                $awayteam = $teams[$total_teams - 1 - $i];
-            }
-            $insertGameStmt->execute([$category_id, "UB Round $round, Game " . ($i + 1), $hometeam, $awayteam]);
-            $ub_games[$round][] = $pdo->lastInsertId();
-        }
-    }
-
-    // 1B: Create Lower Bracket games
-    $total_lb_rounds = ($total_ub_rounds - 1) * 2;
-    for ($round = 1; $round <= $total_lb_rounds; $round++) {
-        $lb_games[$round] = [];
-        // The number of games in lower bracket rounds alternates
-        $num_games_in_round = ($round % 2 != 0) ? count($ub_games[($round + 1) / 2]) : count($lb_games[$round - 1]) / 2;
-        for ($i = 0; $i < $num_games_in_round; $i++) {
-            $insertGameStmt->execute([$category_id, "LB Round $round, Game " . ($i + 1), null, null]);
-            $lb_games[$round][] = $pdo->lastInsertId();
-        }
-    }
-
-    // 1C: Create Grand Final
-    $insertGameStmt->execute([$category_id, "Grand Final", null, null]);
-    $grand_final_id = $pdo->lastInsertId();
-
-    // --- STEP 2: Link the Entire Bracket Using the Stored IDs ---
-
-    $updateStmt = $pdo->prepare(
-        "UPDATE game SET 
-            winner_advances_to_game_id = :win_game, winner_advances_to_slot = :win_slot,
-            loser_advances_to_game_id = :lose_game, loser_advances_to_slot = :lose_slot
-         WHERE id = :game_id"
-    );
-
-    // 2A: Link Upper Bracket games
-    for ($round = 1; $round <= $total_ub_rounds; $round++) {
-        foreach ($ub_games[$round] as $i => $game_id) {
-            $win_game = null; $win_slot = null;
-            $lose_game = null; $lose_slot = null;
-
-            // Link winner to next UB round (except for the final)
-            if ($round < $total_ub_rounds) {
-                $win_game = $ub_games[$round + 1][floor($i / 2)];
-                $win_slot = ($i % 2 == 0) ? 'home' : 'away';
-            } else { // Winner of UB Final goes to Grand Final
-                $win_game = $grand_final_id;
-                $win_slot = 'home';
-            }
-
-            // Link loser to LB
-            if ($round == 1) { // Losers from UB Round 1
-                $lose_game = $lb_games[1][floor($i / 2)];
-                $lose_slot = ($i % 2 == 0) ? 'home' : 'away';
-            } else if ($round < $total_ub_rounds) { // Losers from other UB rounds (not final)
-                $lb_round_to_drop_to = ($round - 1) * 2;
-                $lose_game = $lb_games[$lb_round_to_drop_to][floor($i/2)];
-                $lose_slot = 'away';
-            } else { // Loser of UB Final drops to LB Final
-                $lose_game = end($lb_games[$total_lb_rounds]);
-                $lose_slot = 'home';
-            }
-            $updateStmt->execute(compact('win_game', 'win_slot', 'lose_game', 'lose_slot', 'game_id'));
-        }
-    }
-
-    // 2B: Link Lower Bracket games
-    for ($round = 1; $round <= $total_lb_rounds; $round++) {
-        foreach ($lb_games[$round] as $i => $game_id) {
-            $win_game = null; $win_slot = null;
-            
-            if ($round < $total_lb_rounds) { // If it's not the last LB round
-                // In odd rounds, winners play against UB losers. In even rounds, they play each other.
-                $next_game_idx = ($round % 2 != 0) ? $i : floor($i / 2);
-                $win_game = $lb_games[$round + 1][$next_game_idx];
-                $win_slot = ($round % 2 != 0) ? 'home' : (($i % 2 == 0) ? 'home' : 'away');
-            } else { // Winner of the LB Final goes to Grand Final
-                $win_game = $grand_final_id;
-                $win_slot = 'away';
-            }
-            
-            // Loser is eliminated
-            $lose_game = null; $lose_slot = null;
-            $updateStmt->execute(compact('win_game', 'win_slot', 'lose_game', 'lose_slot', 'game_id'));
-        }
-    }
-
-    // --- Final Step: Mark as generated and commit ---
-
+    // Mark schedule as generated
     $pdo->prepare("UPDATE category SET schedule_generated = 1 WHERE id = ?")->execute([$category_id]);
+    
+    // If we get here, everything is successful. Commit the changes.
     $pdo->commit();
 
+    // Redirect back to the details page
+    // TO:
     header("Location: category_details.php?category_id=$category_id&tab=schedule&success=true");
     exit;
 
 } catch (Exception $e) {
+    // If any error occurred, roll back all database changes
     $pdo->rollBack();
-    die("An error occurred while generating the schedule: " . $e->getMessage());
+    die("An error occurred while generating the double elimination schedule: " . $e->getMessage());
 }
