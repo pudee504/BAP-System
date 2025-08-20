@@ -1,6 +1,7 @@
 <?php
 require 'db.php';
 session_start();
+require_once 'logger.php'; // << INCLUDE THE LOGGER
 
 $team_id = filter_var($_GET['team_id'] ?? null, FILTER_VALIDATE_INT);
 if (!$team_id) {
@@ -8,7 +9,7 @@ if (!$team_id) {
 }
 
 // Fetch team details
-$stmt = $pdo->prepare("SELECT t.team_name, c.category_name FROM team t JOIN category c ON t.category_id = c.id WHERE t.id = ?");
+$stmt = $pdo->prepare("SELECT t.team_name, c.category_name, c.id as category_id FROM team t JOIN category c ON t.category_id = c.id WHERE t.id = ?");
 $stmt->execute([$team_id]);
 $team = $stmt->fetch();
 
@@ -23,21 +24,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $position = trim($_POST['position'] ?? '');
 
     if ($first_name && $last_name && $position) {
-        // Insert player
-        $insert_player = $pdo->prepare("INSERT INTO player (first_name, last_name, position) VALUES (?, ?, ?)");
-        $insert_player->execute([$first_name, $last_name, $position]);
+        try {
+            // Start a transaction for safety
+            $pdo->beginTransaction();
 
-        // Get inserted player_id
-        $player_id = $pdo->lastInsertId();
+            // 1. Insert player
+            $insert_player = $pdo->prepare("INSERT INTO player (first_name, last_name, position) VALUES (?, ?, ?)");
+            $insert_player->execute([$first_name, $last_name, $position]);
 
-        // Link player to team
-        $link_stmt = $pdo->prepare("INSERT INTO player_team (player_id, team_id) VALUES (?, ?)");
-        $link_stmt->execute([$player_id, $team_id]);
+            $player_id = $pdo->lastInsertId();
+
+            // 2. Link player to team
+            $link_stmt = $pdo->prepare("INSERT INTO player_team (player_id, team_id) VALUES (?, ?)");
+            $link_stmt->execute([$player_id, $team_id]);
+            
+            // If both queries succeed, commit the changes
+            $pdo->commit();
+
+            // LOGGING: Record the successful creation
+            $log_details = "Added player '{$first_name} {$last_name}' (ID: {$player_id}) to team '{$team['team_name']}' (ID: {$team_id}). Position: {$position}.";
+            log_action('ADD_PLAYER', 'SUCCESS', $log_details);
+
+        } catch (PDOException $e) {
+            // If anything fails, undo all changes
+            $pdo->rollBack();
+
+            // LOGGING: Record the database error
+            $log_details = "Database error adding player '{$first_name} {$last_name}' to team '{$team['team_name']}'. Error: " . $e->getMessage();
+            log_action('ADD_PLAYER', 'FAILURE', $log_details);
+            die("A database error occurred while adding the player.");
+        }
 
         header("Location: team_details.php?team_id=" . $team_id);
         exit;
     } else {
         $error = "All fields are required.";
+        // LOGGING: Record the validation failure
+        log_action('ADD_PLAYER', 'FAILURE', "Attempted to add a player to team '{$team['team_name']}' with missing fields.");
     }
 }
 
@@ -62,7 +85,7 @@ $player_list = $players->fetchAll();
 <?php include 'includes/header.php'; ?>
 <div class="dashboard-container">
   <h1>Team: <?= htmlspecialchars($team['team_name']) ?></h1>
-  <p><strong>Category:</strong> <?= htmlspecialchars($team['category_name']) ?></p>
+  <p><strong>Category:</strong> <a href="category_details.php?category_id=<?= $team['category_id'] ?>"><?= htmlspecialchars($team['category_name']) ?></a></p>
 
   <h2>Add Player</h2>
   <?php if (!empty($error)): ?>
@@ -76,32 +99,30 @@ $player_list = $players->fetchAll();
     <input type="text" name="last_name" required><br>
 
     <label>Position:</label><br>
-<select name="position" required>
-  <option value="">-- Select Position --</option>
-  <option value="Center">Center</option>
-  <option value="Power Forward">Power Forward</option>
-  <option value="Small Forward">Small Forward</option>
-  <option value="Shooting Guard">Shooting Guard</option>
-  <option value="Point Guard">Point Guard</option>
-</select><br>
+    <select name="position" required>
+      <option value="">-- Select Position --</option>
+      <option value="Center">Center</option>
+      <option value="Power Forward">Power Forward</option>
+      <option value="Small Forward">Small Forward</option>
+      <option value="Shooting Guard">Shooting Guard</option>
+      <option value="Point Guard">Point Guard</option>
+    </select><br>
 
-
-    <button  class="create-league-button" type="submit">Add Player</button>
+    <button class="create-league-button" type="submit">Add Player</button>
   </form>
 
   <h2>Players</h2>
 <?php if ($player_list): ?>
   <table class="category-table">
     <thead>
-  <tr>
-    <th>#</th>
-    <th>First Name</th>
-    <th>Last Name</th>
-    <th>Position</th>
-    <th>Actions</th> <!-- Add this to match Edit/Delete column -->
-  </tr>
-</thead>
-
+      <tr>
+        <th>#</th>
+        <th>First Name</th>
+        <th>Last Name</th>
+        <th>Position</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
     <tbody>
       <?php foreach ($player_list as $index => $player): ?>
         <tr>
@@ -109,11 +130,10 @@ $player_list = $players->fetchAll();
           <td><?= htmlspecialchars($player['first_name']) ?></td>
           <td><?= htmlspecialchars($player['last_name']) ?></td>
           <td><?= htmlspecialchars($player['position']) ?></td>
-<td>
-  <a href="edit_player.php?id=<?= $player['id'] ?>&team_id=<?= $team_id ?>">Edit</a> |
-  <a href="delete_player.php?id=<?= $player['id'] ?>&team_id=<?= $team_id ?>" onclick="return confirm('Are you sure you want to delete this player?');">Delete</a>
-</td>
-
+          <td>
+            <a href="edit_player.php?id=<?= $player['id'] ?>&team_id=<?= $team_id ?>">Edit</a> |
+            <a href="delete_player.php?id=<?= $player['id'] ?>&team_id=<?= $team_id ?>" onclick="return confirm('Are you sure you want to delete this player?');">Delete</a>
+          </td>
         </tr>
       <?php endforeach; ?>
     </tbody>
