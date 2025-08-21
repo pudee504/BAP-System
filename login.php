@@ -1,7 +1,7 @@
 <?php
 session_start();
 require 'db.php'; // Connect to database using PDO
-require_once 'logger.php'; // << 1. INCLUDE THE LOGGER
+require_once 'logger.php'; // Include the logger
 
 // Only accept POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -29,8 +29,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // Query the database for the user
-    $stmt = $pdo->prepare("SELECT id, username, password FROM users WHERE username = :username");
+    // Query the database for the user, now including role_id
+    // --- CHANGED ---
+    $stmt = $pdo->prepare("SELECT id, username, password, role_id FROM users WHERE username = :username");
     $stmt->execute(['username' => $username]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -39,6 +40,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // ✅ Login successful: Set session data
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = $user['username'];
+        
+        // --- ADDED ---
+        // Store the user's role in the session
+        $_SESSION['role_id'] = $user['role_id'];
 
         // LOGGING: Log the successful login
         log_action('LOGIN', 'SUCCESS');
