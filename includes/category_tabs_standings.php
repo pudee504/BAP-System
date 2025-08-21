@@ -1,122 +1,221 @@
 <?php
-// We need the category format to decide what to render
-// CORRECTED QUERY: Joins category -> category_format -> format
+// Get category format name and other details
 $formatStmt = $pdo->prepare("
-    SELECT f.format_name
+    SELECT f.format_name, cf.advance_per_group
     FROM category c
     JOIN category_format cf ON c.id = cf.category_id
     JOIN format f ON cf.format_id = f.id
     WHERE c.id = ?
 ");
 $formatStmt->execute([$category_id]);
-$format = $formatStmt->fetchColumn();
+$formatInfo = $formatStmt->fetch(PDO::FETCH_ASSOC);
+$format = $formatInfo['format_name'] ?? null;
+$advance_per_group = $formatInfo['advance_per_group'] ?? 0;
 
-// Fetch all games for the category with team names
-$gamesStmt = $pdo->prepare("
-    SELECT
-        g.id AS game_id,
-        g.round_name,
-        g.hometeam_id,
-        g.awayteam_id,
-        g.winnerteam_id,
-        ht.team_name AS hometeam_name,
-        awt.team_name AS awayteam_name
-    FROM game g
-    LEFT JOIN team ht ON g.hometeam_id = ht.id
-    LEFT JOIN team awt ON g.awayteam_id = awt.id
-    WHERE g.category_id = ?
-    ORDER BY g.id ASC
-");
-$gamesStmt->execute([$category_id]);
-$all_games = $gamesStmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Group games by their round_name
-$rounds = [];
-foreach ($all_games as $game) {
-    $rounds[$game['round_name']][] = $game;
+/**
+ * Helper function to convert a number to a letter (1=A, 2=B, etc.)
+ */
+function numberToLetter($num) {
+    return chr(64 + $num);
 }
+
 ?>
 
 <div class="tab-content <?= $active_tab === 'standings' ? 'active' : '' ?>" id="standings">
-    <?php if (!$scheduleGenerated || empty($all_games)): ?>
-        <p>The schedule has not been generated yet. Please generate the schedule in the "Schedule" tab to see the standings bracket.</p>
-    <?php else: ?>
-        <link rel="stylesheet" href="includes/bracket_renderer.css">
+    <?php if (!$scheduleGenerated): ?>
+        <p>The schedule has not been generated yet. Please generate the schedule in the "Schedule" tab to see the standings.</p>
 
+    <?php elseif ($format == 'Round Robin'): ?>
+        <link rel="stylesheet" href="includes/standings_renderer.css">
         <?php
-        // This is a helper function to render a single match with W/L logic
-        function render_match($game) {
-            $home_result = '-';
-            $away_result = '-';
+        // --- LIVE STANDINGS CALCULATION ---
 
-            // Check if the game has a winner
-            if (!empty($game['winnerteam_id'])) {
-                if ($game['winnerteam_id'] == $game['hometeam_id']) {
-                    $home_result = 'W';
-                    $away_result = 'L';
-                } elseif ($game['winnerteam_id'] == $game['awayteam_id']) {
-                    $home_result = 'L';
-                    $away_result = 'W';
+        // 1. Get all teams in their assigned groups.
+        $teamsStmt = $pdo->prepare("
+            SELECT t.id, t.team_name, c.cluster_name
+            FROM team t
+            JOIN cluster c ON t.cluster_id = c.id
+            WHERE t.category_id = ?
+            ORDER BY c.cluster_name ASC, t.team_name ASC
+        ");
+        $teamsStmt->execute([$category_id]);
+        $all_teams = $teamsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // 2. Initialize a standings array for every team with zero values.
+        $standings = [];
+        foreach ($all_teams as $team) {
+            $standings[$team['id']] = [
+                'team_id' => $team['id'], // Make team ID available for links
+                'team_name' => $team['team_name'],
+                'cluster_name' => $team['cluster_name'],
+                'matches_played' => 0, 'wins' => 0, 'losses' => 0,
+                'point_scored' => 0, 'points_allowed' => 0, 'point_difference' => 0
+            ];
+        }
+
+        // 3. Get all games WITH A WINNER and calculate the stats.
+        $gamesStmt = $pdo->prepare(
+            "SELECT hometeam_id, awayteam_id, winnerteam_id, hometeam_score, awayteam_score
+             FROM game
+             WHERE category_id = ? AND winnerteam_id IS NOT NULL"
+        );
+        $gamesStmt->execute([$category_id]);
+        $finished_games = $gamesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        // 4. Loop through finished games and calculate stats.
+        foreach ($finished_games as $game) {
+            $home_id = $game['hometeam_id'];
+            $away_id = $game['awayteam_id'];
+
+            if (isset($standings[$home_id]) && isset($standings[$away_id])) {
+                $standings[$home_id]['matches_played']++;
+                $standings[$away_id]['matches_played']++;
+                $standings[$home_id]['point_scored'] += $game['hometeam_score'];
+                $standings[$home_id]['points_allowed'] += $game['awayteam_score'];
+                $standings[$away_id]['point_scored'] += $game['awayteam_score'];
+                $standings[$away_id]['points_allowed'] += $game['hometeam_score'];
+
+                if ($game['winnerteam_id'] == $home_id) {
+                    $standings[$home_id]['wins']++;
+                    $standings[$away_id]['losses']++;
+                } else {
+                    $standings[$away_id]['wins']++;
+                    $standings[$home_id]['losses']++;
                 }
             }
-            ?>
-            <div class="bracket-match">
-                <div class="bracket-teams">
-                    <div class="bracket-team <?= $game['winnerteam_id'] == $game['hometeam_id'] ? 'winner' : '' ?>">
-                        <span class="team-name <?= !$game['hometeam_name'] ? 'placeholder' : '' ?>"><?= htmlspecialchars($game['hometeam_name'] ?? 'TBD') ?></span>
-                        <span class="team-score"><?= $home_result ?></span>
-                    </div>
-                    <div class="bracket-team <?= $game['winnerteam_id'] == $game['awayteam_id'] ? 'winner' : '' ?>">
-                        <span class="team-name <?= !$game['awayteam_name'] ? 'placeholder' : '' ?>"><?= htmlspecialchars($game['awayteam_name'] ?? 'TBD') ?></span>
-                        <span class="team-score"><?= $away_result ?></span>
-                    </div>
-                </div>
-            </div>
-            <?php
         }
+
+        // 5. Group the calculated standings by cluster and sort them correctly.
+        $grouped_standings = [];
+        foreach ($standings as $team_stats) {
+            $team_stats['point_difference'] = $team_stats['point_scored'] - $team_stats['points_allowed'];
+            $grouped_standings[$team_stats['cluster_name']][] = $team_stats;
+        }
+
+        foreach ($grouped_standings as &$group) {
+            usort($group, function($a, $b) {
+                if ($b['wins'] == $a['wins']) {
+                    return $b['point_difference'] <=> $a['point_difference'];
+                }
+                return $b['wins'] <=> $a['wins'];
+            });
+        }
+        unset($group);
+
         ?>
 
-        <?php if ($format == 'Double Elimination'): ?>
-            <h3>Upper Bracket</h3>
-            <div class="bracket-container">
-                <?php
-                $upper_rounds = array_filter($rounds, function($key) {
-                    return strpos($key, 'Upper') !== false || strpos($key, 'Grand Final') !== false;
-                }, ARRAY_FILTER_USE_KEY);
-
-                foreach ($upper_rounds as $round_name => $games): ?>
-                    <div class="bracket-round">
-                        <h4 class="bracket-round-title"><?= htmlspecialchars($round_name) ?></h4>
-                        <?php foreach ($games as $game) { render_match($game); } ?>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-
-            <h3 style="margin-top: 40px;">Lower Bracket</h3>
-            <div class="bracket-container">
-                <?php
-                $lower_rounds = array_filter($rounds, function($key) {
-                    return strpos($key, 'Lower') !== false;
-                }, ARRAY_FILTER_USE_KEY);
-
-                 foreach ($lower_rounds as $round_name => $games): ?>
-                    <div class="bracket-round">
-                        <h4 class="bracket-round-title"><?= htmlspecialchars($round_name) ?></h4>
-                        <?php foreach ($games as $game) { render_match($game); } ?>
-                    </div>
-                <?php endforeach; ?>
-            </div>
-
-        <?php else: // Handles Single Elimination ?>
-            <h3>Tournament Bracket</h3>
-            <div class="bracket-container">
-                <?php foreach ($rounds as $round_name => $games): ?>
-                    <div class="bracket-round">
-                        <h4 class="bracket-round-title"><?= htmlspecialchars($round_name) ?></h4>
-                        <?php foreach ($games as $game) { render_match($game); } ?>
-                    </div>
-                <?php endforeach; ?>
-            </div>
+        <?php if (empty($grouped_standings)): ?>
+             <p>No teams have been assigned to groups yet.</p>
+        <?php else: ?>
+            <?php foreach ($grouped_standings as $group_name => $teams): ?>
+                <h3 class="group-header">Group <?= htmlspecialchars(numberToLetter($group_name)) ?></h3>
+                <table class="standings-table">
+                    <thead>
+                        <tr>
+                            <th class="team-name-col">Team</th>
+                            <th>MP</th> <th>W</th> <th>L</th>
+                            <th>PS</th> <th>PA</th> <th>PD</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($teams as $index => $team):
+                            $advancing_class = ($index < (int)$advance_per_group) ? 'advancing-team' : '';
+                        ?>
+                            <tr class="<?= $advancing_class ?>">
+                                <td class="team-name-col">
+                                    <a href="team_details.php?id=<?= $team['team_id'] ?>">
+                                        <?= htmlspecialchars($team['team_name']) ?>
+                                    </a>
+                                </td>
+                                <td><?= $team['matches_played'] ?></td>
+                                <td><?= $team['wins'] ?></td>
+                                <td><?= $team['losses'] ?></td>
+                                <td><?= $team['point_scored'] ?></td>
+                                <td><?= $team['points_allowed'] ?></td>
+                                <td><?= $team['point_difference'] > 0 ? '+' : '' ?><?= $team['point_difference'] ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            <?php endforeach; ?>
         <?php endif; ?>
+
+    <?php else: // This handles both Single and Double Elimination (Bracket formats) ?>
+        <link rel="stylesheet" href="includes/bracket_renderer.css">
+        <?php
+        $gamesStmt = $pdo->prepare("
+            SELECT g.id AS game_id, g.round_name, g.hometeam_id, g.awayteam_id, g.winnerteam_id,
+                   ht.team_name AS hometeam_name, awt.team_name AS awayteam_name
+            FROM game g
+            LEFT JOIN team ht ON g.hometeam_id = ht.id
+            LEFT JOIN team awt ON g.awayteam_id = awt.id
+            WHERE g.category_id = ? ORDER BY g.id ASC
+        ");
+        $gamesStmt->execute([$category_id]);
+        $all_games = $gamesStmt->fetchAll(PDO::FETCH_ASSOC);
+
+        if (empty($all_games)) {
+            echo "<p>No schedule found for this category.</p>";
+        } else {
+            $rounds = [];
+            foreach ($all_games as $game) {
+                $rounds[$game['round_name']][] = $game;
+            }
+
+            if (!function_exists('render_match')) {
+                function render_match($game) {
+                    $home_result = '-'; $away_result = '-';
+                    if (!empty($game['winnerteam_id'])) {
+                        if ($game['winnerteam_id'] == $game['hometeam_id']) { $home_result = 'W'; $away_result = 'L'; }
+                        elseif ($game['winnerteam_id'] == $game['awayteam_id']) { $home_result = 'L'; $away_result = 'W'; }
+                    }
+                    ?>
+                    <div class="bracket-match">
+                        <div class="bracket-teams">
+                            <div class="bracket-team <?= $game['winnerteam_id'] == $game['hometeam_id'] ? 'winner' : '' ?>">
+                                <span class="team-name <?= !$game['hometeam_name'] ? 'placeholder' : '' ?>"><?= htmlspecialchars($game['hometeam_name'] ?? 'TBD') ?></span>
+                                <span class="team-score"><?= $home_result ?></span>
+                            </div>
+                            <div class="bracket-team <?= $game['winnerteam_id'] == $game['awayteam_id'] ? 'winner' : '' ?>">
+                                <span class="team-name <?= !$game['awayteam_name'] ? 'placeholder' : '' ?>"><?= htmlspecialchars($game['awayteam_name'] ?? 'TBD') ?></span>
+                                <span class="team-score"><?= $away_result ?></span>
+                            </div>
+                        </div>
+                    </div>
+                    <?php
+                }
+            }
+
+            if ($format == 'Double Elimination') {
+                $upper_rounds = array_filter($rounds, function($key) { return strpos($key, 'Upper') !== false || strpos($key, 'Grand Final') !== false; }, ARRAY_FILTER_USE_KEY);
+                $lower_rounds = array_filter($rounds, function($key) { return strpos($key, 'Lower') !== false; }, ARRAY_FILTER_USE_KEY);
+
+                echo '<h3>Upper Bracket</h3><div class="bracket-container">';
+                foreach ($upper_rounds as $round_name => $games) {
+                    echo '<div class="bracket-round"><h4 class="bracket-round-title">' . htmlspecialchars($round_name) . '</h4>';
+                    foreach ($games as $game) { render_match($game); }
+                    echo '</div>';
+                }
+                echo '</div>';
+
+                echo '<h3 style="margin-top: 40px;">Lower Bracket</h3><div class="bracket-container">';
+                foreach ($lower_rounds as $round_name => $games) {
+                    echo '<div class="bracket-round"><h4 class="bracket-round-title">' . htmlspecialchars($round_name) . '</h4>';
+                    foreach ($games as $game) { render_match($game); }
+                    echo '</div>';
+                }
+                echo '</div>';
+
+            } else { // Single Elimination
+                echo '<h3>Tournament Bracket</h3><div class="bracket-container">';
+                foreach ($rounds as $round_name => $games) {
+                    echo '<div class="bracket-round"><h4 class="bracket-round-title">' . htmlspecialchars($round_name) . '</h4>';
+                    foreach ($games as $game) { render_match($game); }
+                    echo '</div>';
+                }
+                echo '</div>';
+            }
+        }
+        ?>
     <?php endif; ?>
 </div>

@@ -1,0 +1,51 @@
+/* includes/standings_renderer.css */
+
+.standings-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-size: 0.9em;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+.standings-table thead tr {
+    background-color: #009879;
+    color: #ffffff;
+    text-align: left;
+}
+
+.standings-table th,
+.standings-table td {
+    padding: 12px 15px;
+    text-align: center;
+}
+
+.standings-table tbody tr {
+    border-bottom: 1px solid #dddddd;
+}
+
+.standings-table tbody tr:nth-of-type(even) {
+    background-color: #f3f3f3;
+}
+
+.standings-table tbody tr:last-of-type {
+    border-bottom: 2px solid #009879;
+}
+
+.standings-table .team-name-col {
+    text-align: left;
+    font-weight: bold;
+}
+
+/* Style for teams advancing to playoffs */
+.standings-table tr.advancing-team {
+    background-color: #d4edda; /* Light green */
+    font-weight: bold;
+    color: #155724; /* Dark green text */
+}
+
+.group-header {
+    margin-top: 30px;
+    padding-bottom: 5px;
+    border-bottom: 2px solid #333;
+}
