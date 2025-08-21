@@ -1,0 +1,99 @@
+/* includes/bracket_renderer.css */
+
+.bracket-container {
+    display: flex;
+    overflow-x: auto;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+}
+
+/* All selectors below are now prefixed with .bracket-container to prevent conflicts */
+
+.bracket-container .bracket-round {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    margin-right: 60px; /* Space between rounds */
+}
+
+.bracket-container .bracket-round-title {
+    font-size: 1.1em;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.bracket-container .bracket-match {
+    margin-bottom: 50px; /* Vertical space between matches */
+    position: relative;
+}
+
+.bracket-container .bracket-match:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    width: 2px;
+    height: calc(50% + 25px); /* Half the match height + half the margin */
+    background-color: #999;
+    left: calc(100% + 29px); /* Center of the space between rounds */
+    top: 50%;
+}
+
+.bracket-container .bracket-match:nth-child(odd):not(:last-child)::after {
+    border-top: 2px solid #999;
+    border-right: 2px solid #999;
+    border-radius: 0 10px 0 0;
+    height: calc(50% + 25px + 2px);
+}
+.bracket-container .bracket-match:nth-child(even):not(:last-child)::after {
+    border-bottom: 2px solid #999;
+    border-right: 2px solid #999;
+    border-radius: 0 0 10px 0;
+    top: -25px; /* Shift up to connect with the previous match's connector */
+}
+
+
+.bracket-container .bracket-teams {
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    width: 220px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.bracket-container .bracket-team {
+    padding: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.bracket-container .bracket-team.winner {
+    font-weight: bold;
+    background-color: #e0ffe0;
+}
+
+.bracket-container .bracket-team:not(:last-child) {
+    border-bottom: 1px solid #ccc;
+}
+
+/* This is the specific rule that was causing the issue, now it's properly scoped */
+.bracket-container .team-name {
+    flex-grow: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis; /* This now only applies to team names INSIDE the bracket */
+}
+.bracket-container .team-name.placeholder {
+    color: #999;
+    font-style: italic;
+}
+
+.bracket-container .team-score {
+    font-weight: bold;
+    margin-left: 10px;
+    padding: 2px 8px;
+    background-color: #f0f0f0;
+    border-radius: 3px;
+}
