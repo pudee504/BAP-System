@@ -37,11 +37,14 @@
     font-weight: bold;
 }
 
-/* Style for teams advancing to playoffs */
+/* ** THE FIX IS HERE **
+We add "!important" to ensure these highlight styles will always override
+any other background or color styles, like the zebra striping.
+*/
 .standings-table tr.advancing-team {
-    background-color: #d4edda; /* Light green */
-    font-weight: bold;
-    color: #155724; /* Dark green text */
+    background-color: #d4edda !important; /* Light green */
+    font-weight: bold !important;
+    color: #155724 !important; /* Dark green text */
 }
 
 .group-header {
