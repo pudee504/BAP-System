@@ -1,3 +1,15 @@
+<?php
+// This PHP block prepares the data needed for the dropdowns
+$usedSeeds = [];
+if (!empty($teams)) {
+    foreach ($teams as $team) {
+        if ($team['seed']) {
+            $usedSeeds[] = $team['seed'];
+        }
+    }
+}
+?>
+
 <?php if ($teams): ?>
   <h3>All Teams</h3>
   <table class="category-table">
@@ -13,12 +25,22 @@
         <tr>
           <td>
             <select 
-  onchange="updateSeed(this, <?= $team['id'] ?>)" 
-  <?= $category['is_locked'] ? 'disabled title="Seedings are locked"' : '' ?>>
+              onchange="updateSeed(this, <?= $team['id'] ?>)" 
+              <?= $category['is_locked'] ? 'disabled title="Seedings are locked"' : '' ?>>
 
-              <option value="">--</option>
+              <option value="" <?= (is_null($team['seed']) || $team['seed'] == 0) ? 'selected' : '' ?>>--</option>
+              
               <?php for ($i = 1; $i <= count($teams); $i++): ?>
-                <option value="<?= $i ?>" <?= ($team['seed'] == $i ? 'selected' : '') ?>><?= $i ?></option>
+                <?php
+                // An option is disabled if it's in use by ANOTHER team
+                $isUsedByAnotherTeam = in_array($i, $usedSeeds) && ($team['seed'] != $i);
+                ?>
+                <option 
+                  value="<?= $i ?>" 
+                  <?= ($team['seed'] == $i ? 'selected' : '') ?> 
+                  <?= $isUsedByAnotherTeam ? 'disabled' : '' ?>>
+                  <?= $i ?>
+                </option>
               <?php endfor; ?>
             </select>
           </td>

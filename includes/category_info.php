@@ -45,7 +45,7 @@ $clusterStmt->execute([$category_id]);
 $clusters = $clusterStmt->fetchAll(PDO::FETCH_ASSOC);
 
 // Fetch teams
-$teamStmt = $pdo->prepare("SELECT * FROM team WHERE category_id = ? ORDER BY seed ASC");
+$teamStmt = $pdo->prepare("SELECT * FROM team WHERE category_id = ? ORDER BY seed IS NULL, seed ASC");
 $teamStmt->execute([$category_id]);
 $teams = $teamStmt->fetchAll();
 $team_count = count($teams);

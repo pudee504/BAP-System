@@ -89,15 +89,25 @@ function updateSeed(selectElem, teamId) {
   fetch('update_seed.php', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'team_id=' + teamId + '&new_seed=' + newSeed
+    // Pass category_id for the duplicate check
+    body: `team_id=${teamId}&new_seed=${newSeed}&category_id=<?= $category_id ?>`
   })
-  .then(res => res.text())
+  .then(res => {
+      if (!res.ok) {
+          // If server returns an error (like a duplicate), get the error text
+          return res.text().then(text => { throw new Error(text) });
+      }
+      return res.text();
+  })
   .then(response => {
     if (response.trim() === 'success') {
-      location.reload();
-    } else {
-      alert('Failed to update seed.');
+      location.reload(); // This is CORRECT for re-sorting the table
     }
+  })
+  .catch(error => {
+      // Display the specific error message from the server
+      alert('Failed to update seed: ' + error.message);
+      location.reload(); // Reload even on error to revert the dropdown
   });
 }
 
