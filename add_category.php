@@ -9,12 +9,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $league_id = (int) $_POST['league_id'];
     $category_name = trim($_POST['category_name']);
     $format_id = (int) $_POST['game_format'];
-
-    if ($format_id === 3) {
-        $num_teams = (int) ($_POST['num_teams_input'] ?? 0);
-    } else {
-        $num_teams = (int) ($_POST['num_teams_dropdown'] ?? 0);
-    }
+    // --- SIMPLIFIED: Read number of teams from a single input field ---
+    $num_teams = (int) ($_POST['num_teams'] ?? 0);
 
     // --- General Input Validation ---
     if (!$league_id || !$category_name || !$format_id || !$num_teams) {
@@ -23,19 +19,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("Invalid input. Please go back and fill in all required fields.");
     }
     
-    // --- MODIFIED: Server-side check for Elimination Formats ---
-    if (($format_id === 1 || $format_id === 2) && $num_teams < 4) {
-        $format_name = ($format_id === 1) ? 'Single Elimination' : 'Double Elimination';
-        $error = "{$format_name} format requires a minimum of 4 teams.";
-        log_action('ADD_CATEGORY', 'FAILURE', "Validation failed for '{$category_name}'. Reason: {$error}");
-        die("Invalid input: {$error}");
-    }
+    // --- UPDATED: Server-side validation for team count ranges ---
+    $error = ''; // Variable to hold our error message
 
+    if ($format_id === 1 || $format_id === 2) { // Single or Double Elimination
+        if ($num_teams < 2 || $num_teams > 32) {
+            $format_name = ($format_id === 1) ? 'Single Elimination' : 'Double Elimination';
+            $error = "{$format_name} format requires between 2 and 32 teams. You entered {$num_teams}.";
+        }
+    }
     // --- Round Robin Specific Validation ---
-    if ($format_id === 3) {
+    elseif ($format_id === 3) {
         $num_groups = (int) ($_POST['num_groups'] ?? 0);
         $advance_per_group = (int) ($_POST['advance_per_group'] ?? 0);
-        $error = ''; // Variable to hold our error message
 
         if ($num_teams > 64) {
             $error = "The maximum number of teams for a Round Robin format is 64. You entered {$num_teams}.";
@@ -60,12 +56,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = "Invalid setup: The total number of advancing teams ({$total_advancing}) must be less than the total number of teams ({$num_teams}).";
             }
         }
+    }
 
-        if ($error) {
-            $log_details = "Round Robin validation failed for category '{$category_name}'. Reason: {$error}";
-            log_action('ADD_CATEGORY', 'FAILURE', $log_details);
-            die("Invalid Round Robin setup: {$error} Please go back and correct the values.");
-        }
+    // --- Centralized Error Handling ---
+    if ($error) {
+        $log_details = "Validation failed for category '{$category_name}'. Reason: {$error}";
+        log_action('ADD_CATEGORY', 'FAILURE', $log_details);
+        die("Invalid setup: {$error} Please go back and correct the values.");
     }
 
 
@@ -142,20 +139,10 @@ $league_id = (int) $_GET['league_id'];
         ?>
       </select>
 
-      <div id="dropdownTeams" style="display:none;">
-        <label for="numTeamsSelect">Number of Teams</label>
-        <select name="num_teams_dropdown" id="numTeamsSelect">
-          <option value="">-- Number of Teams --</option>
-          <option value="4">4</option>
-          <option value="8">8</option>
-          <option value="16">16</option>
-          <option value="32">32</option>
-        </select>
-      </div>
-
-      <div id="customTeams" style="display:none;">
+      <!-- --- UNIFIED INPUT FIELD for Number of Teams --- -->
+      <div id="numTeamsContainer" style="display:none;">
         <label for="numTeamsInput">Number of Teams</label>
-        <input type="number" name="num_teams_input" id="numTeamsInput" min="2">
+        <input type="number" name="num_teams" id="numTeamsInput">
       </div>
 
       <div id="roundRobinOptions" style="display: none;">
@@ -177,33 +164,28 @@ $league_id = (int) $_GET['league_id'];
 
   <script>
     function toggleTeamsInput(format) {
-      const dropdown = document.getElementById('dropdownTeams');
-      const custom = document.getElementById('customTeams');
+      const numTeamsContainer = document.getElementById('numTeamsContainer');
+      const numTeamsInput = document.getElementById('numTeamsInput');
       const roundOptions = document.getElementById('roundRobinOptions');
-      const dropdownSelect = document.getElementById('numTeamsSelect');
-      const optionForTwoTeams = dropdownSelect.querySelector('option[value="2"]');
 
-      // --- MODIFIED SCRIPT ---
+      // Hide all optional sections by default
+      numTeamsContainer.style.display = 'none';
+      roundOptions.style.display = 'none';
+      numTeamsInput.required = false; // Reset required attribute
+
       if (format === '1' || format === '2') { // Single or Double Elimination
-        dropdown.style.display = 'block';
-        custom.style.display = 'none';
-        roundOptions.style.display = 'none';
-
-        // Hide the "2 teams" option for these formats
-        optionForTwoTeams.style.display = 'none';
-        
-        // If "2" was selected, reset the dropdown to prevent submitting a hidden value
-        if (dropdownSelect.value === '2') {
-          dropdownSelect.value = '';
-        }
+        numTeamsContainer.style.display = 'block';
+        numTeamsInput.min = '2';
+        numTeamsInput.max = '32';
+        numTeamsInput.placeholder = '2-32 Teams';
+        numTeamsInput.required = true;
       } else if (format === '3') { // Round Robin
-        dropdown.style.display = 'none';
-        custom.style.display = 'block';
+        numTeamsContainer.style.display = 'block';
         roundOptions.style.display = 'block';
-      } else { // No format selected
-        dropdown.style.display = 'none';
-        custom.style.display = 'none';
-        roundOptions.style.display = 'none';
+        numTeamsInput.min = '2';
+        numTeamsInput.max = '64';
+        numTeamsInput.placeholder = '2-64 Teams';
+        numTeamsInput.required = true;
       }
     }
   </script>

@@ -1,0 +1,109 @@
+.bracket-setup-container {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+.seeding-list-container {
+    flex-basis: 300px;
+    flex-shrink: 0;
+    background: #1e1f24;
+    padding: 15px;
+    border-radius: 5px;
+    border: 1px solid #44475A;
+}
+.seeding-list-container h3 {
+    margin-top: 0;
+    color: #f8f8f2;
+    text-align: center;
+    border-bottom: 1px solid #44475A;
+    padding-bottom: 10px;
+}
+.seeding-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.seed-item {
+    display: flex;
+    align-items: center;
+    background: #44475A;
+    color: #f8f8f2;
+    padding: 12px;
+    margin-bottom: 8px;
+    border-radius: 4px;
+    cursor: grab;
+    border-left: 4px solid #6272A4;
+}
+.seed-item.dragging {
+    opacity: 0.5;
+}
+.seed-number {
+    font-weight: bold;
+    color: #bd93f9;
+    margin-right: 15px;
+}
+.bracket-preview-area {
+    flex-grow: 1;
+}
+.bracket-container {
+    display: flex;
+    overflow-x: auto;
+    padding: 20px;
+    background: #282A36;
+    border: 1px solid #44475A;
+    border-radius: 5px;
+}
+.bracket-round {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    flex-shrink: 0;
+    min-width: 220px;
+}
+.bracket-round-title {
+    text-align: center;
+    font-weight: bold;
+    color: #f8f8f2;
+    margin-bottom: 20px;
+}
+.bracket-matchup {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    padding: 20px 0;
+    flex-grow: 1;
+}
+.bracket-match {
+    background-color: #44475A;
+    border-radius: 4px;
+    width: 100%;
+}
+.bracket-teams {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    color: #f8f8f2;
+}
+.bracket-team {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px;
+    border-bottom: 1px solid #3a3c4a;
+}
+.bracket-team:last-child { border-bottom: none; }
+.bracket-team.winner .team-name { font-weight: bold; color: #50fa7b; }
+.bracket-matchup::after {
+    content: ''; position: absolute; right: 0; top: 50%;
+    transform: translateY(-50%); width: 25px; height: 2px;
+    background-color: #6272A4;
+}
+.bracket-matchup:not(:last-child)::before {
+    content: ''; position: absolute; right: -25px; top: 50%;
+    width: 2px; height: 100%;
+    background-color: #6272A4;
+}
+.bracket-round:last-child .bracket-matchup::after,
+.bracket-round:last-child .bracket-matchup::before {
+    display: none;
+}

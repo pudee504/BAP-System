@@ -1,64 +1,62 @@
 <?php
+// Ensures the database connection is established.
 require_once __DIR__ . '/../db.php';
 
+// Sanitize the category_id from the URL to ensure it's an integer.
 $category_id = filter_var($_GET['category_id'] ?? null, FILTER_VALIDATE_INT);
 
 if (!$category_id) {
+    // Stop execution if the category_id is missing or invalid.
     die("Invalid category ID.");
 }
 
-// Fetch category details
+// Fetch core details about the category, its format, and its current state.
 $stmt = $pdo->prepare("
-    SELECT c.category_name, f.format_name, cf.format_id, cf.num_teams, cf.num_groups, cf.advance_per_group, cf.is_locked, c.schedule_generated
+    SELECT 
+        c.category_name, 
+        c.playoff_seeding_locked, 
+        f.format_name, 
+        cf.format_id, 
+        cf.num_teams, 
+        cf.num_groups, 
+        cf.advance_per_group, 
+        c.schedule_generated
     FROM category c
     JOIN category_format cf ON c.id = cf.category_id
     JOIN format f ON cf.format_id = f.id
     WHERE c.id = ?
 ");
 $stmt->execute([$category_id]);
-$category = $stmt->fetch();
+$category = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$category) {
+    // Stop execution if no category is found with the given ID.
     die("Category not found.");
 }
 
-// If Round Robin, ensure clusters exist
-if (strtolower($category['format_name']) === 'round robin') {
-    $checkClusters = $pdo->prepare("SELECT COUNT(*) FROM cluster WHERE category_id = ?");
-    $checkClusters->execute([$category_id]);
-    $existing_clusters = (int) $checkClusters->fetchColumn();
+// Determine if the category format is a bracket type for conditional rendering later.
+$is_bracket_format = in_array(strtolower($category['format_name']), ['single elimination', 'double elimination']);
 
-    if ($existing_clusters === 0 && $category['num_groups'] > 0) {
-        $insertCluster = $pdo->prepare("INSERT INTO cluster (category_id, cluster_name) VALUES (?, ?)");
-        for ($i = 1; $i <= $category['num_groups']; $i++) {
-            $insertCluster->execute([$category_id, $i]);
-        }
-    }
-}
-
-// Determine format
-$is_round_robin = strtolower($category['format_name']) === 'round robin';
-
-// Fetch clusters
-$clusterStmt = $pdo->prepare("SELECT * FROM cluster WHERE category_id = ? ORDER BY cluster_name ASC");
-$clusterStmt->execute([$category_id]);
-$clusters = $clusterStmt->fetchAll(PDO::FETCH_ASSOC);
-
-// Fetch teams
-$teamStmt = $pdo->prepare("SELECT * FROM team WHERE category_id = ? ORDER BY seed IS NULL, seed ASC");
+// Fetch all teams registered for this category, ordered by name.
+$teamStmt = $pdo->prepare("SELECT * FROM team WHERE category_id = ? ORDER BY team_name ASC");
 $teamStmt->execute([$category_id]);
-$teams = $teamStmt->fetchAll();
+$teams = $teamStmt->fetchAll(PDO::FETCH_ASSOC);
 $team_count = count($teams);
-$remaining_slots = $category['num_teams'] - $team_count;
 
-// Group teams by cluster
-$teams_by_cluster = [];
-foreach ($clusters as $cluster) {
-    $teams_by_cluster[$cluster['id']] = [];
-}
-foreach ($teams as $team) {
-    if ($team['cluster_id']) {
-        $teams_by_cluster[$team['cluster_id']][] = $team;
-    }
+// Check if the number of registered teams has reached the maximum allowed for the category.
+$all_slots_filled = ($team_count >= $category['num_teams']);
+
+// Fetch the ordered bracket positions if it's a bracket-style tournament.
+$bracket_positions = [];
+if ($is_bracket_format) {
+    $posStmt = $pdo->prepare("
+        SELECT bp.position, bp.team_id, t.team_name
+        FROM bracket_positions bp
+        LEFT JOIN team t ON bp.team_id = t.id
+        WHERE bp.category_id = ?
+        ORDER BY bp.position ASC
+    ");
+    $posStmt->execute([$category_id]);
+    $bracket_positions = $posStmt->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>
