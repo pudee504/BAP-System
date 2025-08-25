@@ -38,7 +38,12 @@ if (!$category) {
 $is_bracket_format = in_array(strtolower($category['format_name']), ['single elimination', 'double elimination']);
 
 // Fetch all teams registered for this category, ordered by name.
-$teamStmt = $pdo->prepare("SELECT * FROM team WHERE category_id = ? ORDER BY team_name ASC");
+$teamStmt = $pdo->prepare("
+    SELECT t.* FROM team t
+    JOIN bracket_positions bp ON t.id = bp.team_id
+    WHERE t.category_id = ? 
+    ORDER BY bp.position ASC
+");
 $teamStmt->execute([$category_id]);
 $teams = $teamStmt->fetchAll(PDO::FETCH_ASSOC);
 $team_count = count($teams);

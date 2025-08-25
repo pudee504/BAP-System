@@ -23,30 +23,29 @@
     <!-- A simple table to display the list of registered teams. -->
     <table class="category-table">
         <thead>
+    <tr>
+        <th>Position</th>
+        <th>Team Name</th>
+        <th>Actions</th>
+    </tr>
+</thead>
+<tbody>
+    <?php if (empty($teams)): ?>
+        <tr>
+            <td colspan="3">No teams have been added yet.</td>
+        </tr>
+    <?php else: ?>
+        <?php foreach ($teams as $index => $team): ?>
             <tr>
-                <th>#</th>
-                <th>Team Name</th>
-                <th>Actions</th>
+                <td><?= $index + 1 ?></td>
+                <td><?= htmlspecialchars($team['team_name']) ?></td>
+                <td>
+                    <a href="edit_team.php?team_id=<?= $team['id'] ?>">Edit</a> |
+                    <a href="delete_team.php?team_id=<?= $team['id'] ?>" onclick="return confirm('Are you sure you want to delete this team? This action cannot be undone.')">Delete</a>
+                </td>
             </tr>
-        </thead>
-        <tbody>
-            <?php if (empty($teams)): ?>
-                <tr>
-                    <td colspan="3">No teams have been added yet.</td>
-                </tr>
-            <?php else: ?>
-                <?php foreach ($teams as $index => $team): ?>
-                    <tr>
-                        <td><?= $index + 1 ?></td>
-                        <td><?= htmlspecialchars($team['team_name']) ?></td>
-                        <td>
-                            <!-- Basic management actions for each team. -->
-                            <a href="edit_team.php?team_id=<?= $team['id'] ?>">Edit</a> |
-                            <a href="delete_team.php?team_id=<?= $team['id'] ?>" onclick="return confirm('Are you sure you want to delete this team? This action cannot be undone.')">Delete</a>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            <?php endif; ?>
-        </tbody>
+        <?php endforeach; ?>
+    <?php endif; ?>
+</tbody>
     </table>
 </div>

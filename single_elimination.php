@@ -3,11 +3,11 @@ require_once 'db.php';
 session_start();
 require_once 'logger.php';
 
-// --- HELPER FUNCTION TO GET THE CORRECT SEED ORDER FOR ANY BRACKET SIZE ---
+// --- HELPER FUNCTIONS ---
 if (!function_exists('getSeedOrder')) {
     function getSeedOrder($num_participants) {
         if ($num_participants <= 1) return [1];
-        if (!is_power_of_two($num_participants)) return []; // Safety check
+        if (!is_power_of_two($num_participants)) return [];
         $seeds = [1, 2];
         for ($round = 1; $round < log($num_participants, 2); $round++) {
             $new_seeds = [];
@@ -22,9 +22,7 @@ if (!function_exists('getSeedOrder')) {
     }
 }
 if (!function_exists('is_power_of_two')) {
-    function is_power_of_two($n) {
-        return ($n > 0) && (($n & ($n - 1)) == 0);
-    }
+    function is_power_of_two($n) { return ($n > 0) && (($n & ($n - 1)) == 0); }
 }
 
 $category_id = $_POST['category_id'] ?? null;
@@ -42,63 +40,72 @@ try {
         die("Cannot generate schedule: The bracket is not locked.");
     }
 
-    // --- SETUP ---
+    // Clear existing games for this category before generating new ones
     $pdo->prepare("DELETE FROM game WHERE category_id = ?")->execute([$category_id]);
-    $seed_query = $pdo->prepare("SELECT bp.seed, bp.team_id FROM bracket_positions bp WHERE bp.category_id = ? AND bp.team_id IS NOT NULL ORDER BY bp.seed ASC");
-    $seed_query->execute([$category_id]);
-    $teams_by_seed = [];
-    while ($row = $seed_query->fetch(PDO::FETCH_ASSOC)) {
-        $teams_by_seed[$row['seed']] = $row['team_id'];
-    }
 
-    $num_teams = count($teams_by_seed);
+    // --- START: UNIFIED BRACKET LOGIC (Mirrors the visual display logic) ---
+    $teams_query = $pdo->prepare("SELECT bp.position, bp.team_id FROM bracket_positions bp WHERE bp.category_id = ? ORDER BY bp.position ASC");
+    $teams_query->execute([$category_id]);
+    $results = $teams_query->fetchAll(PDO::FETCH_ASSOC);
+    $teams_by_position = [];
+    foreach ($results as $row) {
+        $teams_by_position[$row['position']] = ['type' => 'team', 'id' => $row['team_id']];
+    }
+    
+    $num_teams = count($teams_by_position);
     if ($num_teams < 2) {
         die("Error: A minimum of 2 teams is required.");
     }
 
+    // Calculate bracket structure parameters
     $main_bracket_size = $num_teams > 1 ? 2 ** floor(log($num_teams - 1, 2)) : 0;
     if ($num_teams > 2 && $num_teams == $main_bracket_size) { $main_bracket_size = $num_teams; }
     if ($num_teams == 2) { $main_bracket_size = 2; }
-    
+
     $num_prelim_matches = $num_teams - $main_bracket_size;
     $num_byes = $main_bracket_size - $num_prelim_matches;
 
     $insertGameStmt = $pdo->prepare("INSERT INTO game (category_id, round, round_name, hometeam_id, awayteam_id) VALUES (?, ?, ?, ?, ?)");
     $all_games_by_round = [];
-    $prelim_winner_map = []; 
-
-    // --- PRELIMINARY ROUND ---
-    if ($num_prelim_matches > 0) {
-        $prelim_game_ids = [];
-        $seeds_in_prelims = range($num_byes + 1, $num_teams);
-        $prelim_top_half = array_slice($seeds_in_prelims, 0, $num_prelim_matches);
-        $prelim_bottom_half = array_reverse(array_slice($seeds_in_prelims, $num_prelim_matches));
-        
-        for ($i = 0; $i < $num_prelim_matches; $i++) {
-            $home_seed = $prelim_top_half[$i];
-            $away_seed = $prelim_bottom_half[$i];
-            $home_team_id = $teams_by_seed[$home_seed];
-            $away_team_id = $teams_by_seed[$away_seed];
-            $insertGameStmt->execute([$category_id, 1, 'Preliminary Round', $home_team_id, $away_team_id]);
-            $game_id = $pdo->lastInsertId();
-            $prelim_game_ids[] = $game_id;
-            $prelim_winner_map[$home_seed] = ['type' => 'winner_from_game', 'id' => $game_id];
-        }
-        $all_games_by_round[1] = $prelim_game_ids;
-    }
     
-    // --- MAIN BRACKET ROUNDS ---
+    // 1. Create Preliminary Round games and create a map of their winners
+    $prelim_winners_map = [];
+    if ($num_prelim_matches > 0) {
+        $teams_in_prelims = array_slice($teams_by_position, $num_byes, null, true);
+        $prelim_top_half = array_slice($teams_in_prelims, 0, $num_prelim_matches, true);
+        $prelim_bottom_half = array_reverse(array_slice($teams_in_prelims, $num_prelim_matches, null, true), true);
+
+        $top_keys = array_keys($prelim_top_half);
+        $bottom_keys = array_keys($prelim_bottom_half);
+
+        for ($i = 0; $i < $num_prelim_matches; $i++) {
+            $home_pos = $top_keys[$i];
+            $away_pos = $bottom_keys[$i];
+            
+            $insertGameStmt->execute([$category_id, 1, 'Preliminary Round', $teams_by_position[$home_pos]['id'], $teams_by_position[$away_pos]['id']]);
+            $game_id = $pdo->lastInsertId();
+            $all_games_by_round[1][] = $game_id;
+            // Map the winner of this game to the position of the higher-seeded team
+            $prelim_winners_map[$home_pos] = ['type' => 'winner_from_game', 'id' => $game_id];
+        }
+    }
+
+    // 2. Build the first main round participants list using the correct seeding logic
     $main_round_seeds = getSeedOrder($main_bracket_size);
     $round_participants = [];
-    foreach($main_round_seeds as $seed) {
-        if ($seed <= $num_byes) {
-            $round_participants[] = ['type' => 'team', 'id' => $teams_by_seed[$seed]];
+    foreach ($main_round_seeds as $seed_slot) {
+        if ($seed_slot <= $num_byes) {
+            // This slot is a bye, so the team advances directly
+            $round_participants[] = $teams_by_position[$seed_slot];
         } else {
-            $round_participants[] = $prelim_winner_map[$seed];
+            // This slot is filled by a winner from the preliminary round
+            $round_participants[] = $prelim_winners_map[$seed_slot];
         }
     }
+    // --- END: UNIFIED BRACKET LOGIC ---
     
-    $round_counter = 2;
+    // 3. Generate Main Bracket Rounds from the correctly assembled participants list
+    $round_counter = 2; // Start main bracket rounds at round 2
     while (count($round_participants) > 1) {
         $round_name = getRoundName(count($round_participants));
         $next_round_participants = [];
@@ -107,9 +114,10 @@ try {
             $home_p = $round_participants[$i];
             $away_p = $round_participants[$i + 1] ?? null;
 
+            // Handle byes in later rounds (shouldn't happen in standard single elim but good practice)
             if ($away_p === null) {
-                 $next_round_participants[] = $home_p;
-                 continue;
+                $next_round_participants[] = $home_p;
+                continue;
             }
 
             $hometeam_id = ($home_p['type'] == 'team') ? $home_p['id'] : null;
@@ -119,11 +127,12 @@ try {
             $new_game_id = $pdo->lastInsertId();
             $games_in_this_round[] = $new_game_id;
             
+            // Link previous games to this new game
             if ($home_p['type'] == 'winner_from_game') {
                 $pdo->prepare("UPDATE game SET winner_advances_to_game_id = ?, winner_advances_to_slot = 'home' WHERE id = ?")->execute([$new_game_id, $home_p['id']]);
             }
             if ($away_p['type'] == 'winner_from_game') {
-                 $pdo->prepare("UPDATE game SET winner_advances_to_game_id = ?, winner_advances_to_slot = 'away' WHERE id = ?")->execute([$new_game_id, $away_p['id']]);
+                $pdo->prepare("UPDATE game SET winner_advances_to_game_id = ?, winner_advances_to_slot = 'away' WHERE id = ?")->execute([$new_game_id, $away_p['id']]);
             }
             $next_round_participants[] = ['type' => 'winner_from_game', 'id' => $new_game_id];
         }
@@ -134,12 +143,13 @@ try {
         $round_counter++;
     }
 
-    // --- 3RD PLACE MATCH ---
+    // 4. Create 3rd Place Match if applicable
     $semifinal_round_num = $round_counter - 2;
     if ($num_teams > 3 && isset($all_games_by_round[$semifinal_round_num]) && count($all_games_by_round[$semifinal_round_num]) == 2) {
         $semifinal_games = $all_games_by_round[$semifinal_round_num];
         $insertGameStmt->execute([$category_id, $semifinal_round_num, '3rd Place Match', null, null]);
         $third_place_game_id = $pdo->lastInsertId();
+        // Link the semifinal losers to the 3rd place game
         $pdo->prepare("UPDATE game SET loser_advances_to_game_id = ?, loser_advances_to_slot = 'home' WHERE id = ?")->execute([$third_place_game_id, $semifinal_games[0]]);
         $pdo->prepare("UPDATE game SET loser_advances_to_game_id = ?, loser_advances_to_slot = 'away' WHERE id = ?")->execute([$third_place_game_id, $semifinal_games[1]]);
     }
