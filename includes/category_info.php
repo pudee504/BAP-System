@@ -50,13 +50,13 @@ $all_slots_filled = ($team_count >= $category['num_teams']);
 $bracket_positions = [];
 if ($is_bracket_format) {
     $posStmt = $pdo->prepare("
-        SELECT bp.position, bp.team_id, t.team_name
-        FROM bracket_positions bp
-        LEFT JOIN team t ON bp.team_id = t.id
-        WHERE bp.category_id = ?
-        ORDER BY bp.position ASC
-    ");
-    $posStmt->execute([$category_id]);
-    $bracket_positions = $posStmt->fetchAll(PDO::FETCH_ASSOC);
+    SELECT bp.position, bp.seed, bp.team_id, t.team_name /* <<< Added bp.seed */
+    FROM bracket_positions bp
+    LEFT JOIN team t ON bp.team_id = t.id
+    WHERE bp.category_id = ?
+    ORDER BY bp.position ASC
+");
+$posStmt->execute([$category_id]);
+$bracket_positions = $posStmt->fetchAll(PDO::FETCH_ASSOC); 
 }
 ?>
