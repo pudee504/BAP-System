@@ -9,7 +9,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $league_id = (int) $_POST['league_id'];
     $category_name = trim($_POST['category_name']);
     $format_id = (int) $_POST['game_format'];
-    // --- SIMPLIFIED: Read number of teams from a single input field ---
     $num_teams = (int) ($_POST['num_teams'] ?? 0);
 
     // --- General Input Validation ---
@@ -44,7 +43,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } 
         else {
             $min_teams_per_group = floor($num_teams / $num_groups);
-
             if ($min_teams_per_group < 2) {
                 $error = "Each group must have at least 2 teams. Your setup results in some groups having only {$min_teams_per_group} team(s).";
             } 
@@ -65,7 +63,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         die("Invalid setup: {$error} Please go back and correct the values.");
     }
 
-
     // --- Database Operations with a Safety Transaction ---
     try {
         $pdo->beginTransaction();
@@ -77,6 +74,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($format_id === 3) {
             $stmt = $pdo->prepare("INSERT INTO category_format (category_id, format_id, num_teams, num_groups, advance_per_group) VALUES (?, ?, ?, ?, ?)");
             $stmt->execute([$category_id, $format_id, $num_teams, $num_groups, $advance_per_group]);
+
+            // --- START: ADDED CODE ---
+            // Automatically create the clusters (groups) for the Round Robin format
+            $clusterInsertStmt = $pdo->prepare("INSERT INTO cluster (category_id, cluster_name) VALUES (?, ?)");
+            for ($i = 1; $i <= $num_groups; $i++) {
+                $clusterInsertStmt->execute([$category_id, $i]);
+            }
+            // --- END: ADDED CODE ---
+
         } else {
             $stmt = $pdo->prepare("INSERT INTO category_format (category_id, format_id, num_teams) VALUES (?, ?, ?)");
             $stmt->execute([$category_id, $format_id, $num_teams]);

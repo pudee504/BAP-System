@@ -44,8 +44,13 @@ if ($scheduleGenerated) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Category Details</title>
+    
     <?php include 'includes/head_styles.php'; ?>
-    <!-- Include SortableJS library for drag-and-drop functionality -->
+    
+    <link rel="stylesheet" href="includes/standings_renderer.css">
+
+    
+
     <script src="js/Sortable.min.js"></script>
 </head>
 <body>

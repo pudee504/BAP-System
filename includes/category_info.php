@@ -39,16 +39,29 @@ if (!$category) {
 // Note: We now use the aliased 'tournament_format' key for this logic.
 $is_bracket_format = in_array(strtolower($category['tournament_format']), ['single elimination', 'double elimination']);
 
-// Fetch all teams registered for this category, ordered by name.
-$teamStmt = $pdo->prepare("
-    SELECT t.* FROM team t
-    JOIN bracket_positions bp ON t.id = bp.team_id
-    WHERE t.category_id = ? 
-    ORDER BY bp.position ASC
-");
+// --- START: CORRECTED CODE BLOCK ---
+// Fetch teams based on the tournament format.
+if ($is_bracket_format) {
+    // For bracket formats, fetch teams based on their position in the bracket.
+    $teamStmt = $pdo->prepare("
+        SELECT t.* FROM team t
+        JOIN bracket_positions bp ON t.id = bp.team_id
+        WHERE t.category_id = ? 
+        ORDER BY bp.position ASC
+    ");
+} else {
+    // For non-bracket formats (like Round Robin), fetch all teams directly.
+    $teamStmt = $pdo->prepare("
+        SELECT * FROM team 
+        WHERE category_id = ? 
+        ORDER BY id ASC
+    ");
+}
+
 $teamStmt->execute([$category_id]);
 $teams = $teamStmt->fetchAll(PDO::FETCH_ASSOC);
 $team_count = count($teams);
+// --- END: CORRECTED CODE BLOCK ---
 
 // Check if the number of registered teams has reached the maximum allowed for the category.
 $all_slots_filled = ($team_count >= $category['num_teams']);
