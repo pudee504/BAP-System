@@ -193,19 +193,29 @@ if (!$scheduleGenerated):
     </div>
 <?php
 else:
-// --- LIVE MODE (Corrected) ---
+// --- LIVE MODE ---
 ?>
     <?php
     // --- 1. FETCH ALL GAME DATA ---
     $third_place_match = null;
-    $all_games_query = $pdo->prepare("SELECT g.id, g.round, g.round_name, g.hometeam_id, g.awayteam_id, g.winnerteam_id, g.hometeam_score, g.awayteam_score, g.game_status, ht.team_name as hometeam_name, awt.team_name as awayteam_name, bph.seed as hometeam_seed, bpa.seed as awayteam_seed, bph.position as hometeam_pos FROM game g LEFT JOIN team ht ON g.hometeam_id = ht.id LEFT JOIN team awt ON g.awayteam_id = awt.id LEFT JOIN bracket_positions bph ON g.hometeam_id = bph.team_id AND bph.category_id = g.category_id LEFT JOIN bracket_positions bpa ON g.awayteam_id = bpa.team_id AND bpa.category_id = g.category_id WHERE g.category_id = ? ORDER BY g.round ASC, g.id ASC");
+    $all_games_query = $pdo->prepare("SELECT g.id, g.round, g.round_name, g.hometeam_id, g.awayteam_id, g.winnerteam_id, g.hometeam_score, g.awayteam_score, g.game_status, g.winner_advances_to_game_id, g.winner_advances_to_slot, ht.team_name as hometeam_name, awt.team_name as awayteam_name, bph.seed as hometeam_seed, bpa.seed as awayteam_seed, bph.position as hometeam_pos FROM game g LEFT JOIN team ht ON g.hometeam_id = ht.id LEFT JOIN team awt ON g.awayteam_id = awt.id LEFT JOIN bracket_positions bph ON g.hometeam_id = bph.team_id AND bph.category_id = g.category_id LEFT JOIN bracket_positions bpa ON g.awayteam_id = bpa.team_id AND bpa.category_id = g.category_id WHERE g.category_id = ? ORDER BY g.round ASC, g.id ASC");
     $all_games_query->execute([$category_id]);
     $all_games = $all_games_query->fetchAll(PDO::FETCH_ASSOC);
 
     $matchNumberMap = [];
     foreach (array_values($all_games) as $index => $game) { $matchNumberMap[$game['id']] = $index + 1; }
+    
+    $feederMap = [];
+    foreach ($all_games as $game) {
+        if ($game['winner_advances_to_game_id']) {
+            $target_game_id = $game['winner_advances_to_game_id'];
+            $target_slot = $game['winner_advances_to_slot'];
+            $source_match_number = $matchNumberMap[$game['id']];
+            $feederMap[$target_game_id][$target_slot] = $source_match_number;
+        }
+    }
 
-    // --- 2. RECALCULATE BRACKET STRUCTURE FOR ALIGNMENT (Mirrors SETUP MODE) ---
+    // --- 2. RECALCULATE BRACKET STRUCTURE FOR ALIGNMENT ---
     $teams_query = $pdo->prepare("SELECT COUNT(*) FROM bracket_positions WHERE category_id = ?");
     $teams_query->execute([$category_id]);
     $num_teams = $teams_query->fetchColumn();
@@ -260,7 +270,6 @@ else:
                     for ($i = 0; $i < $matches_in_first_main_round; $i++):
                         $slot_seed_home = $main_round_seeds[$i * 2];
                         $slot_seed_away = $main_round_seeds[$i * 2 + 1];
-
                         $home_is_prelim = ($slot_seed_home > $num_byes);
                         $away_is_prelim = ($slot_seed_away > $num_byes);
 
@@ -274,7 +283,7 @@ else:
                             if (isset($prelim_games[$correct_prelim_pos])) {
                                 $render_match($prelim_games[$correct_prelim_pos], $matchNumberMap);
                             } else {
-                                echo '<div class="bracket-spacer"></div>'; // Should not happen but for safety
+                                echo '<div class="bracket-spacer"></div>';
                             }
                         } else {
                             echo '<div class="bracket-spacer"></div>';
@@ -284,7 +293,7 @@ else:
                 </div>
             <?php endif; ?>
 
-            <?php // --- MAIN ROUNDS (Live Mode) --- ?>
+            <?php // --- MAIN ROUNDS (Live Mode with Placeholders) --- ?>
             <?php 
             $round_num = 1; 
             foreach ($main_round_games as $round_name => $round_matches): 
@@ -308,8 +317,13 @@ else:
                                         <span class="seed">(<?= htmlspecialchars($match['hometeam_seed']) ?>)</span>
                                         <span class="team-name"><?= htmlspecialchars($match['hometeam_name']) ?></span>
                                         <span class="score"><?= ($match['game_status'] == 'Final') ? $match['hometeam_score'] : '' ?></span>
-                                    <?php else: ?>
-                                        <span class="team-name placeholder">TBD</span>
+                                    <?php else: 
+                                        $placeholder = 'TBD';
+                                        if (isset($feederMap[$match['id']]['home'])) {
+                                            $placeholder = 'Winner of Match ' . $feederMap[$match['id']]['home'];
+                                        }
+                                    ?>
+                                        <span class="team-name placeholder"><?= $placeholder ?></span>
                                     <?php endif; ?>
                                 </div>
                                 <div class="bracket-team <?= ($match['winnerteam_id'] && $match['winnerteam_id'] == $match['awayteam_id']) ? 'winner' : '' ?>">
@@ -317,8 +331,13 @@ else:
                                         <span class="seed">(<?= htmlspecialchars($match['awayteam_seed']) ?>)</span>
                                         <span class="team-name"><?= htmlspecialchars($match['awayteam_name']) ?></span>
                                         <span class="score"><?= ($match['game_status'] == 'Final') ? $match['awayteam_score'] : '' ?></span>
-                                    <?php else: ?>
-                                        <span class="team-name placeholder">TBD</span>
+                                    <?php else:
+                                        $placeholder = 'TBD';
+                                        if (isset($feederMap[$match['id']]['away'])) {
+                                            $placeholder = 'Winner of Match ' . $feederMap[$match['id']]['away'];
+                                        }
+                                    ?>
+                                        <span class="team-name placeholder"><?= $placeholder ?></span>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -330,6 +349,7 @@ else:
             endforeach; 
             ?>
         </div>
+        <?php // ?>
         <?php if ($third_place_match): ?>
         <div class="third-place-container">
             <div class="bracket-round">

@@ -11,9 +11,15 @@
             <p>Please add all <?= $category['num_teams'] ?> teams in the 'Teams' tab before setting up the bracket.</p>
         <?php else: ?>
             <?php 
-            // Load the new interactive bracket visualizer.
-            // This file will contain all the logic for rendering and interacting with the bracket.
-            require 'includes/bracket_visualizer.php'; 
+            // === MODIFICATION START ===
+            // Conditionally load the correct visualizer based on the tournament format.
+            if ($category['tournament_format'] === 'Double Elimination') {
+                require 'includes/double_elim_visualizer.php'; 
+            } else {
+                // Default to single elimination
+                require 'includes/bracket_visualizer.php'; 
+            }
+            // === MODIFICATION END ===
             ?>
         <?php endif; ?>
     <?php else: // This block handles non-bracket formats, specifically Round Robin. ?>
@@ -83,7 +89,7 @@
                             <?php foreach ($teams_in_group as $index => $team):
                                 $advancing_class = ($index < (int)$category['advance_per_group']) ? 'advancing-team' : ''; ?>
                                 <tr class="<?= $advancing_class ?>">
-                                    <td class="team-name-col"><a href="team_details.php?team_id=<?= $team['team_id'] ?>"><?= htmlspecialchars($team['team_name']) ?></a></td>
+                                    <td class="team-name-col"><a href="team_details.php?team_id=<?= $team['id'] ?>"><?= htmlspecialchars($team['team_name']) ?></a></td>
                                     <td><?= $team['matches_played'] ?></td><td><?= $team['wins'] ?></td><td><?= $team['losses'] ?></td>
                                     <td><?= $team['point_scored'] ?></td><td><?= $team['points_allowed'] ?></td>
                                     <td><?= $team['point_difference'] > 0 ? '+' : '' ?><?= $team['point_difference'] ?></td>

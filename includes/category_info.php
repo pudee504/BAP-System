@@ -15,7 +15,8 @@ $stmt = $pdo->prepare("
     SELECT 
         c.category_name, 
         c.playoff_seeding_locked, 
-        f.format_name, 
+        f.format_name, -- Fetched for category_details.php
+        f.format_name AS tournament_format, -- Aliased for the bracket visualizers
         cf.format_id, 
         cf.num_teams, 
         cf.num_groups, 
@@ -35,7 +36,8 @@ if (!$category) {
 }
 
 // Determine if the category format is a bracket type for conditional rendering later.
-$is_bracket_format = in_array(strtolower($category['format_name']), ['single elimination', 'double elimination']);
+// Note: We now use the aliased 'tournament_format' key for this logic.
+$is_bracket_format = in_array(strtolower($category['tournament_format']), ['single elimination', 'double elimination']);
 
 // Fetch all teams registered for this category, ordered by name.
 $teamStmt = $pdo->prepare("

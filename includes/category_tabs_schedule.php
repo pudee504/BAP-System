@@ -15,6 +15,8 @@
             $action_url = '';
             if ($category['format_name'] === 'Single Elimination') {
                 $action_url = 'single_elimination.php';
+            } else if ($category['format_name'] === 'Double Elimination') {
+                $action_url = 'double_elimination.php'; 
             }
             // You can add more format handlers here, e.g., 'generate_double_elimination.php'
             // if ($category['format_name'] === 'Double Elimination') $action_url = 'generate_double_elimination.php';
@@ -24,24 +26,20 @@
                 <button type="submit">Generate <?= htmlspecialchars($category['format_name']) ?> Schedule</button>
             </form>
         <?php else: ?>
-            <!-- If the bracket isn't locked, the button is disabled, and a message is shown. -->
             <button type="button" disabled>Generate Schedule</button>
             <p style="color: red; font-size: 0.9em; margin-top: 5px;">
                 You must fill all team slots and lock the bracket in the 'Standings' tab before generating a schedule.
             </p>
         <?php endif; ?>
     <?php else: ?>
-        <!-- This block is shown if the schedule has already been generated. -->
         <p style="color: green;"><strong>Schedule already generated.</strong></p>
 
         <?php if ($hasFinalGames): ?>
-            <!-- Prevent regeneration if games have been marked as 'Final'. -->
             <button disabled style="background-color: #6c757d;">Regenerate Schedule</button>
             <p style="color: red; font-size: 0.9em; margin-top: 5px;">
                 Cannot regenerate schedule because at least one game has a 'Final' status.
             </p>
         <?php else: ?>
-            <!-- Allow regeneration if no games are final. -->
             <form action="clear_schedule.php" method="POST" onsubmit="return confirm('WARNING: This will delete all existing games and allow you to generate a new schedule. This action cannot be undone. Proceed?')">
                 <input type="hidden" name="category_id" value="<?= $category_id ?>">
                 <button type="submit" style="background-color: #dc3545; color: white;">Regenerate Schedule</button>
@@ -57,7 +55,16 @@
         LEFT JOIN team t1 ON g.hometeam_id = t1.id
         LEFT JOIN team t2 ON g.awayteam_id = t2.id
         WHERE g.category_id = ?
-        ORDER BY round ASC, id ASC
+        -- MODIFIED: This ORDER BY clause now matches the graphical bracket's logic,
+        -- ensuring the Match # is consistent everywhere.
+        ORDER BY 
+            CASE g.bracket_type
+                WHEN 'winner' THEN 1
+                WHEN 'loser' THEN 2
+                WHEN 'grand_final' THEN 3
+            END ASC, 
+            g.round ASC, 
+            g.id ASC
     ");
     $scheduleStmt->execute([$category_id]);
     $games = $scheduleStmt->fetchAll(PDO::FETCH_ASSOC);
