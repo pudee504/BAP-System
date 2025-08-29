@@ -23,17 +23,19 @@ $stmt = $pdo->prepare("SELECT * FROM game_timer WHERE game_id = ?");
 $stmt->execute([$game_id]);
 $timer = $stmt->fetch(PDO::FETCH_ASSOC);
 
+// MODIFIED: Time is now handled in milliseconds for precision
 $_SESSION['game_timers'][$game_id] = $timer ? [
-    'game_clock' => (int)$timer['game_clock'],
-    'shot_clock' => (int)$timer['shot_clock'],
+    'game_clock' => (int)$timer['game_clock'], // Assuming this is already stored in ms from previous sessions
+    'shot_clock' => (int)$timer['shot_clock'], // Assuming this is already stored in ms from previous sessions
     'quarter_id' => (int)$timer['quarter_id'],
     'running' => (bool)$timer['running']
 ] : [
-    'game_clock' => 600,
-    'shot_clock' => 24,
+    'game_clock' => 600 * 1000, // 600 seconds -> 600000 ms
+    'shot_clock' => 24 * 1000, // 24 seconds -> 24000 ms
     'quarter_id' => 1,
     'running' => false
 ];
+
 
 $quarter_id = $_SESSION['game_timers'][$game_id]['quarter_id'];
 $game_clock = $_SESSION['game_timers'][$game_id]['game_clock'];
@@ -113,17 +115,19 @@ $away_players = $stmt->fetchAll(PDO::FETCH_ASSOC);
 // Update game status if not finalized
 $pdo->prepare("UPDATE game SET game_status = 'Active' WHERE id = ? AND game_status != 'Completed'")->execute([$game_id]);
 
-// Helper functions
-function getCurrentHalf($quarter) {
-    return $quarter <= 2 ? 1 : ($quarter <= 4 ? 2 : 3);
-}
 
+// Add this after you fetch player data
+$log_stmt = $pdo->prepare("SELECT * FROM game_log WHERE game_id = ? ORDER BY id ASC");
+$log_stmt->execute([$game_id]);
+$game_logs = $log_stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Helper functions
+function getCurrentHalf($quarter) { return $quarter <= 2 ? 1 : ($quarter <= 4 ? 2 : 3); }
 function getInitialTimeouts($half, $overtimeCount = 0) {
     if ($half === 1) return 2;
     if ($half === 2) return 3;
     return 1;
 }
-
 function loadTimeouts($pdo, $game_id, $team_id, $half, $overtimeCount) {
     $initial = getInitialTimeouts($half, $overtimeCount);
     $stmt = $pdo->prepare("
@@ -134,14 +138,12 @@ function loadTimeouts($pdo, $game_id, $team_id, $half, $overtimeCount) {
     $stmt->execute([$game_id, $team_id, $half, $initial]);
     return $initial;
 }
-
 function safeLoadTimeouts($pdo, $game_id, $team_id, $half) {
     $stmt = $pdo->prepare("SELECT remaining_timeouts FROM game_timeouts WHERE game_id = ? AND team_id = ? AND half = ?");
     $stmt->execute([$game_id, $team_id, $half]);
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
     return $row ? (int)$row['remaining_timeouts'] : null;
 }
-
 function loadTeamFouls(PDO $pdo, $game_id, $team_id, $quarter) {
     $stmt = $pdo->prepare("SELECT fouls FROM game_team_fouls WHERE game_id = ? AND team_id = ? AND quarter = ?");
     $stmt->execute([$game_id, $team_id, $quarter]);
@@ -296,60 +298,25 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
         <button onclick="saveWinner()">Save Winner</button>
     </div>
 
+    <div class="game-log-container">
+    <h2>Game Log</h2>
+    <ul id="gameLogList">
+        </ul>
+</div>
+
     <script>
         const gameData = {
             gameId: <?php echo json_encode($game_id); ?>,
-            teamA: {
-                id: <?php echo json_encode($game['hometeam_id']); ?>,
-                name: <?php echo json_encode($game['home_team_name']); ?>,
-                players: <?php echo json_encode($home_players); ?>
-            },
-            teamB: {
-                id: <?php echo json_encode($game['awayteam_id']); ?>,
-                name: <?php echo json_encode($game['away_team_name']); ?>,
-                players: <?php echo json_encode($away_players); ?>
-            },
+            teamA: { id: <?php echo json_encode($game['hometeam_id']); ?>, name: <?php echo json_encode($game['home_team_name']); ?>, players: <?php echo json_encode($home_players); ?> },
+            teamB: { id: <?php echo json_encode($game['awayteam_id']); ?>, name: <?php echo json_encode($game['away_team_name']); ?>, players: <?php echo json_encode($away_players); ?> },
             winnerTeamId: <?php echo json_encode($game['winnerteam_id'] ?? null); ?>,
-            gameStatus: <?php echo json_encode($game['game_status'] ?? 'Active'); ?>
+            gameStatus: <?php echo json_encode($game['game_status'] ?? 'Active'); ?>,
+            logs: <?php echo json_encode($game_logs); ?>
         };
 
         const playerStats = {
-            teamA: gameData.teamA.players.map(p => ({
-                id: p.id,
-                jersey: p.jersey_number ?? '--',
-                name: `${p.last_name.toUpperCase()}, ${p.first_name.charAt(0).toUpperCase()}.`,
-                isPlaying: p.is_playing ?? 0,
-                displayOrder: p.display_order ?? 999999,
-                stats: {
-                    '1PM': Number(p['1PM']) || 0,
-                    '2PM': Number(p['2PM']) || 0,
-                    '3PM': Number(p['3PM']) || 0,
-                    'REB': Number(p['REB']) || 0,
-                    'AST': Number(p['AST']) || 0,
-                    'BLK': Number(p['BLK']) || 0,
-                    'STL': Number(p['STL']) || 0,
-                    'TO': Number(p['TO']) || 0,
-                    'FOUL': Number(p['FOUL']) || 0
-                }
-            })),
-            teamB: gameData.teamB.players.map(p => ({
-                id: p.id,
-                jersey: p.jersey_number ?? '--',
-                name: `${p.last_name.toUpperCase()}, ${p.first_name.charAt(0).toUpperCase()}.`,
-                isPlaying: p.is_playing ?? 0,
-                displayOrder: p.display_order ?? 999999,
-                stats: {
-                    '1PM': Number(p['1PM']) || 0,
-                    '2PM': Number(p['2PM']) || 0,
-                    '3PM': Number(p['3PM']) || 0,
-                    'REB': Number(p['REB']) || 0,
-                    'AST': Number(p['AST']) || 0,
-                    'BLK': Number(p['BLK']) || 0,
-                    'STL': Number(p['STL']) || 0,
-                    'TO': Number(p['TO']) || 0,
-                    'FOUL': Number(p['FOUL']) || 0
-                }
-            }))
+            teamA: gameData.teamA.players.map(p => ({ id: p.id, jersey: p.jersey_number ?? '--', name: `${p.last_name.toUpperCase()}, ${p.first_name.charAt(0).toUpperCase()}.`, isPlaying: p.is_playing ?? 0, displayOrder: p.display_order ?? 999999, stats: { '1PM': Number(p['1PM']) || 0, '2PM': Number(p['2PM']) || 0, '3PM': Number(p['3PM']) || 0, 'FOUL': Number(p['FOUL']) || 0, 'REB': Number(p['REB']) || 0, 'AST': Number(p['AST']) || 0, 'BLK': Number(p['BLK']) || 0, 'STL': Number(p['STL']) || 0, 'TO': Number(p['TO']) || 0 } })),
+            teamB: gameData.teamB.players.map(p => ({ id: p.id, jersey: p.jersey_number ?? '--', name: `${p.last_name.toUpperCase()}, ${p.first_name.charAt(0).toUpperCase()}.`, isPlaying: p.is_playing ?? 0, displayOrder: p.display_order ?? 999999, stats: { '1PM': Number(p['1PM']) || 0, '2PM': Number(p['2PM']) || 0, '3PM': Number(p['3PM']) || 0, 'FOUL': Number(p['FOUL']) || 0, 'REB': Number(p['REB']) || 0, 'AST': Number(p['AST']) || 0, 'BLK': Number(p['BLK']) || 0, 'STL': Number(p['STL']) || 0, 'TO': Number(p['TO']) || 0 } }))
         };
 
         const inGameCounts = {
@@ -362,6 +329,7 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
             teamB: <?php echo json_encode($foulsB); ?>
         };
 
+        // MODIFIED: Variables now hold milliseconds
         let gameClock = <?php echo $game_clock; ?>;
         let shotClock = <?php echo $shot_clock; ?>;
         let quarter = <?php echo $quarter_id; ?>;
@@ -369,9 +337,7 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
         let gameClockInterval = null;
         let shotClockInterval = null;
 
-        function calculatePoints(stats) {
-            return stats['1PM'] * 1 + stats['2PM'] * 2 + stats['3PM'] * 3;
-        }
+        function calculatePoints(stats) { return stats['1PM'] * 1 + stats['2PM'] * 2 + stats['3PM'] * 3; }
 
         function updateRunningScore(teamId) {
             const players = playerStats[teamId];
@@ -382,16 +348,8 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
             fetch('update_game_scores.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    game_id: gameData.gameId,
-                    hometeam_score: scoreA,
-                    awayteam_score: scoreB
-                })
-            }).then(res => res.json()).then(data => {
-                if (!data.success) {
-                    console.error('Failed to update scores:', data.error);
-                }
-            }).catch(error => console.error('Error updating scores:', error));
+                body: JSON.stringify({ game_id: gameData.gameId, hometeam_score: scoreA, awayteam_score: scoreB })
+            }).then(res => res.json()).then(data => { if (!data.success) { console.error('Failed to update scores:', data.error); } }).catch(error => console.error('Error updating scores:', error));
             updateClocksUI();
         }
 
@@ -424,22 +382,12 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
 
         function updatePlayerOrder(teamId) {
             const players = playerStats[teamId];
-            players.forEach((player, idx) => {
-                player.displayOrder = idx;
-            });
+            players.forEach((player, idx) => { player.displayOrder = idx; });
             fetch('update_player_order.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    game_id: gameData.gameId,
-                    team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id,
-                    order: players.map(p => p.id)
-                })
-            }).then(response => response.json()).then(data => {
-                if (!data.success) {
-                    console.error(`Failed to update order for ${teamId}:`, data.error);
-                }
-            }).catch(error => console.error(`Error updating order for ${teamId}:`, error));
+                body: JSON.stringify({ game_id: gameData.gameId, team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id, order: players.map(p => p.id) })
+            }).then(response => response.json()).then(data => { if (!data.success) { console.error(`Failed to update order for ${teamId}:`, data.error); } }).catch(error => console.error(`Error updating order for ${teamId}:`, error));
         }
 
         function togglePlayer(teamId, playerIdx, isChecked) {
@@ -454,25 +402,13 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
                 return;
             }
             player.isPlaying = isChecked ? 1 : 0;
-            const reordered = [
-                ...players.filter(p => p.isPlaying),
-                ...players.filter(p => !p.isPlaying)
-            ];
+            const reordered = [ ...players.filter(p => p.isPlaying), ...players.filter(p => !p.isPlaying) ];
             playerStats[teamId] = reordered;
             fetch('update_player_status.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    game_id: gameData.gameId,
-                    player_id: player.id,
-                    team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id,
-                    is_playing: player.isPlaying
-                })
-            }).then(response => response.json()).then(data => {
-                if (!data.success) {
-                    console.error(`Failed to update status for ${player.name}:`, data.error);
-                }
-            }).catch(error => console.error(`Error updating status for ${player.name}:`, error));
+                body: JSON.stringify({ game_id: gameData.gameId, player_id: player.id, team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id, is_playing: player.isPlaying })
+            }).then(response => response.json()).then(data => { if (!data.success) { console.error(`Failed to update status for ${player.name}:`, data.error); } }).catch(error => console.error(`Error updating status for ${player.name}:`, error));
             updatePlayerOrder(teamId);
             renderTeam(teamId);
         }
@@ -484,17 +420,8 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
             fetch('update_jersey_number.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    game_id: gameData.gameId,
-                    player_id: player.id,
-                    team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id,
-                    jersey_number: jerseyNumber
-                })
-            }).then(res => res.json()).then(data => {
-                if (!data.success) {
-                    console.error(`Failed to update jersey for ${player.name}:`, data.error);
-                }
-            }).catch(err => console.error(`Error updating jersey for ${player.name}:`, err));
+                body: JSON.stringify({ game_id: gameData.gameId, player_id: player.id, team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id, jersey_number: jerseyNumber })
+            }).then(res => res.json()).then(data => { if (!data.success) { console.error(`Failed to update jersey for ${player.name}:`, data.error); } }).catch(err => console.error(`Error updating jersey for ${player.name}:`, err));
         }
 
         function updateBonusUI(teamId) {
@@ -520,32 +447,20 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
                 fetch('update_team_fouls.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        game_id: gameData.gameId,
-                        team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id,
-                        quarter: quarter,
-                        fouls: teamFouls[teamId]
-                    })
-                }).then(res => res.json()).then(data => {
-                    if (!data.success) {
-                        console.error(`Failed to update team fouls for ${teamId}`, data.error);
-                    }
-                }).catch(console.error);
+                    body: JSON.stringify({ game_id: gameData.gameId, team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id, quarter: quarter, fouls: teamFouls[teamId] })
+                }).then(res => res.json()).then(data => { if (!data.success) { console.error(`Failed to update team fouls for ${teamId}`, data.error); } }).catch(console.error);
             }
             fetch('update_stat.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    game_id: gameData.gameId,
-                    player_id: player.id,
-                    team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id,
-                    statistic_name: stat,
-                    value: delta
-                })
+                body: JSON.stringify({ game_id: gameData.gameId, player_id: player.id, team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id, statistic_name: stat, value: delta })
             }).then(response => response.json()).then(data => {
-                if (!data.success) {
-                    console.error(`Failed to update stat for ${player.name}:`, data.error);
-                }
+                if (!data.success) { console.error(`Failed to update stat for ${player.name}:`, data.error);
+         }   else {
+            if (delta > 0) {
+                logStatChange(player, teamId, stat);
+            }
+         }
                 renderTeam(teamId);
             }).catch(error => console.error(`Error updating stat for ${player.name}:`, error));
         }
@@ -561,15 +476,30 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
             if (btns) btns.style.display = 'none';
         }
 
-        function formatTime(sec) {
-            let m = Math.floor(sec / 60);
-            let s = sec % 60;
-            return `${m}:${s.toString().padStart(2, '0')}`;
+        // --- NEW: Formatting functions for milliseconds ---
+        function formatGameTime(ms) {
+            if (ms <= 0) return "00:00.0";
+            const totalSeconds = Math.floor(ms / 1000);
+            const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+            const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+            if (totalSeconds < 60) {
+                const tenths = Math.floor((ms % 1000) / 100).toString();
+                return `${minutes}:${seconds}.${tenths}`;
+            }
+            return `${minutes}:${seconds}`;
         }
 
+        function formatShotTime(ms) {
+            if (ms <= 0) return "0.0";
+            const seconds = Math.floor(ms / 1000);
+            const tenths = Math.floor((ms % 1000) / 100);
+            return `${seconds}.${tenths}`;
+        }
+
+        // MODIFIED: Uses the new formatting functions
         function updateClocksUI() {
-            document.getElementById('gameClock').textContent = formatTime(gameClock);
-            document.getElementById('shotClock').textContent = shotClock;
+            document.getElementById('gameClock').textContent = formatGameTime(gameClock);
+            document.getElementById('shotClock').textContent = formatShotTime(shotClock);
             document.getElementById('quarterLabel').textContent = quarter <= 4 ? 
                 ['1st', '2nd', '3rd', '4th'][quarter - 1] + ' Quarter' : `Overtime ${quarter - 4}`;
             const nextBtn = document.getElementById('nextQuarterBtn');
@@ -583,7 +513,7 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
                 finalizeBtn.style.display = 'none';
                 return;
             }
-            if (gameClock === 0) {
+            if (gameClock <= 0) {
                 const scoreA = parseInt(document.getElementById('scoreA').textContent) || 0;
                 const scoreB = parseInt(document.getElementById('scoreB').textContent) || 0;
                 if (quarter < 4) {
@@ -603,35 +533,27 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
             fetch('save_timer_state.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    game_id: gameData.gameId,
-                    game_clock: gameClock,
-                    shot_clock: shotClock,
-                    quarter_id: quarter,
-                    running: clocksRunning
-                })
-            }).then(res => res.json()).then(data => {
-                if (!data.success) {
-                    console.error('Failed to save timer state:', data.error);
-                }
-            }).catch(error => console.error('Error saving timer state:', error));
+                body: JSON.stringify({ game_id: gameData.gameId, game_clock: gameClock, shot_clock: shotClock, quarter_id: quarter, running: clocksRunning })
+            }).then(res => res.json()).then(data => { if (!data.success) { console.error('Failed to save timer state:', data.error); } }).catch(error => console.error('Error saving timer state:', error));
         }
 
+        // MODIFIED: Your original setInterval engine, but adapted for milliseconds
         function startClocks() {
-            if (gameData.gameStatus === 'Final') return;
+            if (gameData.gameStatus === 'Final' || clocksRunning) return;
+            const interval = 100; // Update every 100ms for tenths of a second
+
             if (!gameClockInterval) {
                 gameClockInterval = setInterval(() => {
-                    if (gameClock > 0) gameClock--;
+                    if (gameClock > 0) { gameClock -= interval; } else { gameClock = 0; }
                     updateClocksUI();
-                    saveTimerState();
-                }, 1000);
+                    if (gameClock % 1000 === 0) saveTimerState();
+                }, interval);
             }
             if (!shotClockInterval) {
                 shotClockInterval = setInterval(() => {
-                    if (shotClock > 0) shotClock--;
+                    if (shotClock > 0) { shotClock -= interval; } else { shotClock = 0; }
                     updateClocksUI();
-                    saveTimerState();
-                }, 1000);
+                }, interval);
             }
             clocksRunning = true;
             document.getElementById('toggleClockBtn').textContent = 'Pause';
@@ -656,9 +578,10 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
             }
         }
 
+        // MODIFIED: Clock adjustment functions now work with milliseconds
         function resetShotClock(isOffensiveRebound = false) {
             if (gameData.gameStatus === 'Final') return;
-            const maxShot = isOffensiveRebound ? 14 : 24;
+            const maxShot = (isOffensiveRebound ? 14 : 24) * 1000;
             shotClock = Math.min(gameClock, maxShot);
             updateClocksUI();
             saveTimerState();
@@ -671,7 +594,7 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
         function nextQuarter() {
             if (gameData.gameStatus === 'Final') return;
             quarter++;
-            gameClock = quarter <= 4 ? 600 : 300;
+            gameClock = (quarter <= 4 ? 600 : 300) * 1000;
             resetShotClock(false);
             updateClocksUI();
             saveTimerState();
@@ -685,17 +608,8 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
                 fetch('update_team_fouls.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        game_id: gameData.gameId,
-                        team_id: gameData[teamId].id,
-                        quarter: quarter,
-                        fouls: 0
-                    })
-                }).then(res => res.json()).then(data => {
-                    if (!data.success) {
-                        console.error(`Failed to update team fouls for ${teamId}:`, data.error);
-                    }
-                }).catch(error => console.error(`Error updating team fouls for ${teamId}:`, error));
+                    body: JSON.stringify({ game_id: gameData.gameId, team_id: gameData[teamId].id, quarter: quarter, fouls: 0 })
+                }).then(res => res.json()).then(data => { if (!data.success) { console.error(`Failed to update team fouls for ${teamId}:`, data.error); } }).catch(error => console.error(`Error updating team fouls for ${teamId}:`, error));
             });
             const half = quarter <= 2 ? 1 : (quarter <= 4 ? 2 : 3);
             const overtime = Math.max(0, quarter - 4);
@@ -705,12 +619,7 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
                 fetch('load_timeouts.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        game_id: gameData.gameId,
-                        team_id: teamId,
-                        half: half,
-                        overtime: overtime
-                    })
+                    body: JSON.stringify({ game_id: gameData.gameId, team_id: teamId, half: half, overtime: overtime })
                 })
                 .then(res => res.json())
                 .then(data => {
@@ -720,6 +629,29 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
                     }
                 }).catch(error => console.error(`Error loading timeouts for team ${teamKey}:`, error));
             });
+        }
+
+        function adjustGameClock(deltaInSeconds) {
+            if (clocksRunning || gameData.gameStatus === 'Final') return;
+            const maxTime = (quarter <= 4 ? 600 : 300) * 1000;
+            gameClock = Math.max(0, Math.min(gameClock + (deltaInSeconds * 1000), maxTime));
+            if (shotClock > gameClock) {
+                shotClock = gameClock;
+            }
+            updateClocksUI();
+            saveTimerState();
+        }
+
+        function adjustGameClockMinute(deltaInMinutes) {
+            adjustGameClock(deltaInMinutes * 60);
+        }
+
+        function adjustShotClock(deltaInSeconds) {
+            if (clocksRunning || gameData.gameStatus === 'Final') return;
+            const maxShot = 24 * 1000;
+            shotClock = Math.max(0, Math.min(shotClock + (deltaInSeconds * 1000), Math.min(maxShot, gameClock)));
+            updateClocksUI();
+            saveTimerState();
         }
 
         function finalizeGame() {
@@ -735,16 +667,11 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
             fetch('save_winner.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    game_id: gameData.gameId,
-                    winnerteam_id: winnerTeam.id
-                })
+                body: JSON.stringify({ game_id: gameData.gameId, winnerteam_id: winnerTeam.id })
             })
             .then(res => res.json())
             .then(data => {
-                if (!data.success) {
-                    throw new Error('Failed to save winner: ' + data.error);
-                }
+                if (!data.success) { throw new Error('Failed to save winner: ' + data.error); }
                 gameData.winnerTeamId = winnerTeam.id;
                 return fetch('finalize_game.php', {
                     method: 'POST',
@@ -754,9 +681,7 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
             })
             .then(res => res.json())
             .then(data => {
-                if (!data.success) {
-                    throw new Error('Failed to finalize game: ' + data.error);
-                }
+                if (!data.success) { throw new Error('Failed to finalize game: ' + data.error); }
                 gameData.gameStatus = 'Final';
                 alert("Game finalized! Winner: " + winnerTeam.name);
                 displayWinner(winnerTeam.id);
@@ -784,7 +709,7 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
                 if (!confirm("Are you sure you want to unset the winner?")) return;
             }
             const winnerTeam = selected === 'A' ? gameData.teamA :
-                              selected === 'B' ? gameData.teamB : null;
+                                selected === 'B' ? gameData.teamB : null;
             fetch('save_winner.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -811,16 +736,12 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
         }
 
         function displayWinner(winnerId) {
-            document.querySelectorAll('.winner-label').forEach(el => el.remove());
+            document.querySelectorAll('.winner-label').forEach(el => el.style.visibility = 'hidden');
             if (winnerId) {
-                const label = document.createElement('span');
-                label.classList.add('winner-label');
-                label.textContent = '(Winner)';
-                label.style.visibility = 'visible';
                 if (winnerId == gameData.teamA.id) {
-                    document.getElementById('home-box').prepend(label);
+                    document.querySelector('#home-box .winner-label').style.visibility = 'visible';
                 } else if (winnerId == gameData.teamB.id) {
-                    document.getElementById('away-box').appendChild(label);
+                    document.querySelector('#away-box .winner-label').style.visibility = 'visible';
                 }
             }
         }
@@ -834,6 +755,7 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
             renderTeam('teamB');
             updateBonusUI('teamA');
             updateBonusUI('teamB');
+            renderInitialLog(); 
             if (gameData.winnerTeamId) {
                 displayWinner(gameData.winnerTeamId);
             }
@@ -855,6 +777,7 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
                     });
                     const result = await response.json();
                     if (result.success) {
+                        logTimeoutAction(teamKey);
                         el.textContent = result.remaining;
                         if (result.remaining <= 0) {
                             el.disabled = true;
@@ -864,34 +787,188 @@ $winnerteam_id = $game['winnerteam_id'] ?? null;
             });
         });
 
-        function adjustGameClock(delta) {
-            if (clocksRunning || gameData.gameStatus === 'Final') return;
-            const maxTime = quarter <= 4 ? 600 : 300;
-            gameClock = Math.max(0, Math.min(gameClock + delta, maxTime));
-            if (shotClock > gameClock) {
-                shotClock = gameClock;
-            }
-            updateClocksUI();
-            saveTimerState();
-        }
+async function undoAction(logId) {
+    if (!confirm("Are you sure you want to undo this action?")) return;
 
-        function adjustGameClockMinute(delta) {
-            if (clocksRunning || gameData.gameStatus === 'Final') return;
-            const maxTime = quarter <= 4 ? 600 : 300;
-            gameClock = Math.max(0, Math.min(gameClock + delta * 60, maxTime));
-            if (shotClock > gameClock) {
-                shotClock = gameClock;
-            }
-            updateClocksUI();
-            saveTimerState();
-        }
+    try {
+        const response = await fetch('undo_specific_action.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ log_id: logId })
+        });
+        const result = await response.json();
 
-        function adjustShotClock(delta) {
-            if (clocksRunning || gameData.gameStatus === 'Final') return;
-            shotClock = Math.max(0, Math.min(shotClock + delta, Math.min(24, gameClock)));
-            updateClocksUI();
-            saveTimerState();
+        if (result.success) {
+            // Re-render the single log item with its new "undone" state
+            renderLogEntry(result.log_entry);
+            // Reloading is the simplest way to ensure all stats and scores are accurate.
+            alert("Action undone. Page will now refresh to update scores.");
+            location.reload(); 
+        } else {
+            alert("Failed to undo action: " + result.error);
         }
+    } catch (error) {
+        console.error('Undo error:', error);
+        alert("An error occurred while undoing the action.");
+    }
+}
+
+async function redoAction(logId) {
+    if (!confirm("Are you sure you want to redo this action?")) return;
+
+    try {
+        const response = await fetch('redo_specific_action.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ log_id: logId })
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            // Re-render the single log item with its new "active" state
+            renderLogEntry(result.log_entry);
+            // Reloading is the simplest way to ensure all stats and scores are accurate.
+            alert("Action redone. Page will now refresh to update scores.");
+            location.reload();
+        } else {
+            alert("Failed to redo action: " + result.error);
+        }
+    } catch (error) {
+        console.error('Redo error:', error);
+        alert("An error occurred while redoing the action.");
+    }
+}
+
+// Add these new functions
+function renderLogEntry(log) {
+    const logList = document.getElementById('gameLogList');
+    // Find existing list item or create a new one
+    let li = document.getElementById(`log-${log.id}`);
+    if (!li) {
+        li = document.createElement('li');
+        li.id = `log-${log.id}`;
+        logList.insertBefore(li, logList.firstChild);
+    }
+
+    const time = formatGameTime(log.game_clock_ms);
+
+    // Clear previous content
+    li.innerHTML = ''; 
+
+    const textSpan = document.createElement('span');
+    textSpan.textContent = `[Q${log.quarter} ${time}] ${log.action_details}`;
+
+    let button;
+    if (log.is_undone == 1) {
+        // If undone, show a "Redo" button and style the text
+        li.style.textDecoration = 'line-through';
+        li.style.color = '#888';
+        button = document.createElement('button');
+        button.textContent = 'Redo';
+        button.onclick = () => redoAction(log.id);
+    } else {
+        // Otherwise, show an "Undo" button
+        li.style.textDecoration = 'none';
+        li.style.color = 'inherit';
+        button = document.createElement('button');
+        button.textContent = 'Undo';
+        button.onclick = () => undoAction(log.id);
+    }
+
+    li.appendChild(textSpan);
+    li.appendChild(button);
+}
+
+function renderInitialLog() {
+    // Clear any existing log items
+    document.getElementById('gameLogList').innerHTML = ''; 
+    // Render logs fetched from PHP (newest first is handled by the loop)
+    gameData.logs.forEach(log => renderLogEntry(log));
+}
+
+function logStatChange(player, teamId, stat) {
+    // This map creates more descriptive log messages
+    const statDescriptions = {
+        '1PM': 'made a 1-Point Shot',
+        '2PM': 'made a 2-Point Shot',
+        '3PM': 'made a 3-Point Shot',
+        'FOUL': 'committed a Foul',
+        'REB': 'got a Rebound',
+        'AST': 'recorded an Assist',
+        'BLK': 'recorded a Block',
+        'STL': 'recorded a Steal',
+        'TO': 'committed a Turnover'
+    };
+    
+    const description = statDescriptions[stat] || `recorded a ${stat}`;
+    const team = teamId === 'teamA' ? gameData.teamA : gameData.teamB;
+    const details = `${player.name} (${team.name}) ${description}.`;
+
+    const logData = {
+        game_id: gameData.gameId,
+        player_id: player.id,
+        team_id: team.id,
+        quarter: quarter,
+        game_clock: gameClock, // gameClock is in ms
+        action_type: stat,
+        action_details: details
+    };
+
+    fetch('log_game_action.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(logData)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            // THE FIX for NaN:NaN is here. We ensure the time property is named correctly.
+            const newLog = { 
+                id: data.log_id, 
+                quarter: logData.quarter,
+                game_clock_ms: logData.game_clock, // Use the correct property name
+                action_details: logData.action_details
+            };
+            renderLogEntry(newLog);
+        }
+    });
+}
+
+// Add this new function to your script
+function logTimeoutAction(teamKey) {
+    const team = teamKey === 'A' ? gameData.teamA : gameData.teamB;
+    const details = `${team.name} called a Timeout.`;
+
+    const logData = {
+        game_id: gameData.gameId,
+        player_id: null, // No specific player for a team timeout
+        team_id: team.id,
+        quarter: quarter,
+        game_clock: gameClock,
+        action_type: 'TIMEOUT',
+        action_details: details
+    };
+
+    fetch('log_game_action.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(logData)
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            const newLog = { 
+                id: data.log_id, 
+                quarter: logData.quarter,
+                game_clock_ms: logData.game_clock,
+                action_details: logData.action_details,
+                is_undone: 0 // New actions are never undone
+            };
+            renderLogEntry(newLog);
+        }
+    });
+}
+
     </script>
 </body>
 </html>

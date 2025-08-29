@@ -235,3 +235,44 @@ tr:has(.in-game-checkbox:checked) {
   font-size: 28px;
   padding: 0 10px;
 }
+
+.game-log-container {
+    /* Set a width. 90% is good for responsiveness. */
+    width: 90%;
+    
+    /* Set a max-width so it doesn't get too wide on large screens. */
+    max-width: 800px; 
+    
+    /* This is the key part: auto margins on left/right will center it. */
+    margin: 40px auto; /* Adds 40px of space on top/bottom and centers it horizontally */
+    
+    /* Optional: Add some styling to the box itself. */
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    padding: 10px 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.game-log-container h2 {
+    text-align: center; /* Centers the "Game Log" title */
+    margin-top: 10px;
+}
+
+#gameLogList {
+    list-style-type: none; /* Removes the default bullet points */
+    padding: 0;
+    max-height: 400px; /* Gives the log a max height with a scrollbar */
+    overflow-y: auto; /* Adds a scrollbar if the content overflows */
+}
+
+#gameLogList li {
+    display: flex;
+    justify-content: space-between; /* Puts space between the text and the button */
+    align-items: center;
+    padding: 8px 10px;
+    border-bottom: 1px solid #eee;
+}
+
+#gameLogList li:last-child {
+    border-bottom: none;
+}
