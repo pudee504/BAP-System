@@ -58,7 +58,9 @@ if ($scheduleGenerated) {
 <?php include 'includes/header.php'; ?>
 
 <div class="dashboard-container">
-    <h1>Category: <?= htmlspecialchars($category['category_name']) ?></h1>
+    
+    <h1><a href="league_details.php?id=<?= $category['league_id'] ?>">Category</a>:<?= htmlspecialchars($category['category_name']) ?></h1>
+    
     <p><strong>Format:</strong> <?= htmlspecialchars($category['format_name']) ?></p>
     <p><strong>Number of Teams:</strong> <?= $category['num_teams'] ?></p>
     
@@ -66,10 +68,8 @@ if ($scheduleGenerated) {
         <p><strong>Groups:</strong> <?= $category['num_groups'] ?> (<?= $category['advance_per_group'] ?> advance per group)</p>
     <?php endif; ?>
 
-    <!-- Navigation tabs for different sections -->
     <?php include 'includes/category_tabs.php'; ?>
 
-    <!-- Container for the content of the active tab -->
     <div class="tab-container">
         <?php include 'includes/category_tabs_teams.php'; ?>
         <?php include 'includes/category_tabs_schedule.php'; ?>
@@ -106,8 +106,6 @@ function toggleDateForm(gameId) {
         form.style.display = (form.style.display === 'none' || form.style.display === '') ? 'block' : 'none';
     }
 }
-
-
 </script>
 
 </body>

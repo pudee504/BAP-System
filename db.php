@@ -12,4 +12,7 @@ try {
 } catch (PDOException $e) {
     die("Database connection failed: " . $e->getMessage());
 }
+
+// **REQUIRED CHANGE:** Add this line to the end of the file.
+return $pdo;
 ?>

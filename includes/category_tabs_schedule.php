@@ -87,14 +87,28 @@
                     <tr id="game-row-<?= $game['id'] ?>">
                         <td><?= $index + 1 ?></td>
                         <td><?= htmlspecialchars($game['round_name'] ?: 'Round ' . $game['round']) ?></td>
+                        
                         <td class="match-cell">
                             <div class="match-grid">
                                 <div class="team-name">
-                                    <?= $game['hometeam_id'] ? htmlspecialchars($game['home_name']) : 'TBD' ?>
+                                    <?= $game['hometeam_id'] ? '<a href="team_details.php?team_id=' . $game['hometeam_id'] . '">' . htmlspecialchars($game['home_name']) . '</a>' : 'TBD' ?>
                                 </div>
-                                <div class="team-result">vs</div>
+                                <div class="team-result <?= $game['winnerteam_id'] ? ($game['hometeam_id'] == $game['winnerteam_id'] ? 'win' : 'loss') : '' ?>">
+                                    <?php if ($game['winnerteam_id']): ?>
+                                        <?= ($game['hometeam_id'] == $game['winnerteam_id']) ? 'W' : 'L' ?>
+                                    <?php else: ?>
+                                        -
+                                    <?php endif; ?>
+                                </div>
                                 <div class="team-name">
-                                    <?= $game['awayteam_id'] ? htmlspecialchars($game['away_name']) : 'TBD' ?>
+                                    <?= $game['awayteam_id'] ? '<a href="team_details.php?team_id=' . $game['awayteam_id'] . '">' . htmlspecialchars($game['away_name']) . '</a>' : 'TBD' ?>
+                                </div>
+                                <div class="team-result <?= $game['winnerteam_id'] ? ($game['awayteam_id'] == $game['winnerteam_id'] ? 'win' : 'loss') : '' ?>">
+                                    <?php if ($game['winnerteam_id']): ?>
+                                        <?= ($game['awayteam_id'] == $game['winnerteam_id']) ? 'W' : 'L' ?>
+                                    <?php else: ?>
+                                        -
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </td>

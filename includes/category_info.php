@@ -12,15 +12,16 @@ if (!$category_id) {
 
 // Fetch core details about the category, its format, and its current state.
 $stmt = $pdo->prepare("
-    SELECT 
-        c.category_name, 
-        c.playoff_seeding_locked, 
+    SELECT
+        c.league_id, -- <<< THIS IS THE FIX
+        c.category_name,
+        c.playoff_seeding_locked,
         f.format_name, -- Fetched for category_details.php
         f.format_name AS tournament_format, -- Aliased for the bracket visualizers
-        cf.format_id, 
-        cf.num_teams, 
-        cf.num_groups, 
-        cf.advance_per_group, 
+        cf.format_id,
+        cf.num_teams,
+        cf.num_groups,
+        cf.advance_per_group,
         c.schedule_generated
     FROM category c
     JOIN category_format cf ON c.id = cf.category_id
@@ -46,14 +47,14 @@ if ($is_bracket_format) {
     $teamStmt = $pdo->prepare("
         SELECT t.* FROM team t
         JOIN bracket_positions bp ON t.id = bp.team_id
-        WHERE t.category_id = ? 
+        WHERE t.category_id = ?
         ORDER BY bp.position ASC
     ");
 } else {
     // For non-bracket formats (like Round Robin), fetch all teams directly.
     $teamStmt = $pdo->prepare("
-        SELECT * FROM team 
-        WHERE category_id = ? 
+        SELECT * FROM team
+        WHERE category_id = ?
         ORDER BY id ASC
     ");
 }
@@ -77,6 +78,6 @@ if ($is_bracket_format) {
     ORDER BY bp.position ASC
 ");
 $posStmt->execute([$category_id]);
-$bracket_positions = $posStmt->fetchAll(PDO::FETCH_ASSOC); 
+$bracket_positions = $posStmt->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>

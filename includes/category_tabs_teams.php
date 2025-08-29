@@ -42,7 +42,8 @@
                 <?php foreach ($teams as $index => $team): ?>
                     <tr>
                         <td><?= $index + 1 ?></td>
-                        <td><?= htmlspecialchars($team['team_name']) ?></td>
+                        
+                        <td><a href="team_details.php?team_id=<?= $team['id'] ?>"><?= htmlspecialchars($team['team_name']) ?></a></td>
 
                         <?php if (strtolower($category['format_name']) === 'round robin'): ?>
                             <td>

@@ -122,6 +122,7 @@ $league_id = (int) $_GET['league_id'];
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Add Category</title>
   <link rel="stylesheet" href="style.css">
 
