@@ -159,6 +159,36 @@ if (!$game_id) { die("Invalid game ID."); }
                 console.error('Failed to fetch timer state:', error);
             }
         }
+
+        async function finalizeGame() {
+            if (!confirm("Are you sure you want to finalize this game? This will set the winner based on the current score and end the game.")) {
+                return;
+            }
+
+            try {
+                const response = await fetch('finalize_game.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ game_id: gameId })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('Game has been finalized successfully! The winner will now be displayed on the management page.');
+                    // Disable all controls on this page since the game is over
+                    document.querySelectorAll('button').forEach(btn => btn.disabled = true);
+                    document.getElementById('toggleClockBtn').textContent = 'Game Over';
+                    document.getElementById('toggleClockBtn').classList.remove('running');
+                } else {
+                    alert('Error finalizing game: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Failed to send finalize request:', error);
+                alert('A network error occurred while trying to finalize the game.');
+            }
+        }
+        // --- END OF NEW FUNCTION ---
         
         function runLocalTimer() {
             if (localTimerInterval) clearInterval(localTimerInterval);

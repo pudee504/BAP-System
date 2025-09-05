@@ -132,11 +132,10 @@ if ($teams_are_set) {
     // --- QR CODE GENERATION ---
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
     
-    // --- FIX FOR NETWORK CONNECTION ---
-    // We will manually set the IP address to the one you provided.
-    // This is the most reliable way to ensure your phone can connect.
-    // If your computer's IP address changes in the future, you will need to update it here.
-    $host = '192.168.1.3'; // <<<<<<< YOUR IP ADDRESS HERE
+    // ** THE DYNAMIC FIX **
+    // This line automatically discovers the laptop's IP address on the local network.
+    // You no longer need to manually change this.
+    $host = gethostbyname(gethostname());
 
     $uri = rtrim(dirname($_SERVER['PHP_SELF']), '/\\');
     $control_url = "{$protocol}{$host}{$uri}/timer_control.php?game_id={$game_id}";
@@ -201,9 +200,10 @@ if ($teams_are_set) {
                 teamB: <?php echo json_encode($foulsB); ?>
             };
 
-            // --- STATE VARIABLES POPULATED BY POLLING ---
+            // --- STATE VARIABLES ---
             let gameClockMs = 0;
             let currentQuarter = <?php echo json_encode($current_quarter); ?>;
+            let pollingInterval = null; // **FIX**: Variable to hold our timer
 
             function calculatePoints(stats) { return stats['1PM'] * 1 + stats['2PM'] * 2 + stats['3PM'] * 3; }
             
@@ -214,7 +214,6 @@ if ($teams_are_set) {
                 const scoreA = parseInt(document.getElementById('scoreA').textContent) || 0;
                 const scoreB = parseInt(document.getElementById('scoreB').textContent) || 0;
                 
-                // FIX: Added proper .then() and .catch() to see if saving the score fails
                 fetch('update_game_scores.php', { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
@@ -245,7 +244,8 @@ if ($teams_are_set) {
                             <td class="stat-cell" onmouseover="showButtons(this)" onmouseleave="hideButtons(this)">
                                 <span style="${stat === 'FOUL' && isFouledOut ? 'color: red;' : ''}">${stats[stat]}</span>
                                 <span class="stat-controls" style="display: none;">
-                                    <button onclick="updateStat('${teamId}', ${idx}, '${stat}', 1)" ${gameData.gameStatus === 'Final' ? 'disabled' : ''}>+</button>
+                                    
+                                    <button onclick="updateStat('${teamId}', ${idx}, '${stat}', 1)" ${gameData.gameStatus === 'Final' || (stat === 'FOUL' && isFouledOut) ? 'disabled' : ''}>+</button>
                                     <button onclick="updateStat('${teamId}', ${idx}, '${stat}', -1)" ${gameData.gameStatus === 'Final' ? 'disabled' : ''}>-</button>
                                 </span>
                             </td>`).join('')}
@@ -253,7 +253,6 @@ if ($teams_are_set) {
                     `;
                     tbody.appendChild(tr);
                 });
-                // Note: updateRunningScore is now called on page load, not here, to prevent loops.
             }
 
             function updatePlayerOrder(teamId) {
@@ -286,12 +285,20 @@ if ($teams_are_set) {
             }
             
             function updateBonusUI(teamId) {
-                document.getElementById(`bonus-${teamId}`).style.display = teamFouls[teamId] >= 5 ? "inline" : "none";
+                document.getElementById(`bonus-${teamId}`).style.display = teamFouls[teamId] >= 4 ? "inline" : "none";
             }
             
             function updateStat(teamId, playerIdx, stat, delta) {
                 if(gameData.gameStatus === 'Final') return;
                 const player = playerStats[teamId][playerIdx];
+                
+                // MODIFICATION START: Add a check to prevent adding fouls beyond 5
+                if (stat === 'FOUL' && delta > 0 && player.stats[stat] >= 5) {
+                    alert(`${player.name} has already fouled out and cannot receive more fouls.`);
+                    return; // Stop the function here
+                }
+                // MODIFICATION END
+                
                 if (!window.confirm(`${delta > 0 ? "Add" : "Remove"} ${stat} ${delta > 0 ? "to" : "from"} ${player.name}?`)) return;
                 
                 player.stats[stat] = Math.max(0, player.stats[stat] + delta);
@@ -315,10 +322,10 @@ if ($teams_are_set) {
                             logStatChange(player, teamId, stat);
                         }
                         renderTeam(teamId);
-                        updateRunningScore(teamId); // Update score after stat is confirmed saved
+                        updateRunningScore(teamId);
                     } else {
                         console.error("Failed to update stat:", data.error);
-                        player.stats[stat] = Math.max(0, player.stats[stat] - delta); // Revert local change
+                        player.stats[stat] = Math.max(0, player.stats[stat] - delta); // Revert
                         renderTeam(teamId);
                         updateRunningScore(teamId);
                     }
@@ -368,7 +375,7 @@ if ($teams_are_set) {
                 if (!li) {
                     li = document.createElement('li');
                     li.id = `log-${log.id}`;
-                    logList.insertBefore(li, logList.firstChild); // Prepend to show newest first
+                    logList.insertBefore(li, logList.firstChild);
                 }
                 const time = formatGameTime(log.game_clock_ms);
                 li.innerHTML = ''; 
@@ -413,8 +420,6 @@ if ($teams_are_set) {
                     action_details: details
                 };
                 
-                // FIX: Rebuilt the client-side log object from the server response.
-                // This is more robust and ensures the log entry is displayed correctly.
                 fetch('log_game_action.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(logData) })
                 .then(res => res.json())
                 .then(data => {
@@ -422,7 +427,7 @@ if ($teams_are_set) {
                         const newLog = { 
                             id: data.log_id, 
                             quarter: logData.quarter,
-                            game_clock_ms: logData.game_clock, // Use the time we sent
+                            game_clock_ms: logData.game_clock,
                             action_details: logData.action_details,
                             is_undone: 0
                         };
@@ -447,7 +452,6 @@ if ($teams_are_set) {
                     action_details: details
                 };
                 
-                // FIX: Also applied the robust logging fix here.
                 fetch('log_game_action.php', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(logData) })
                 .then(res => res.json())
                 .then(data => {
@@ -494,20 +498,30 @@ if ($teams_are_set) {
             async function fetchAndApplyState() {
                 try {
                     const response = await fetch(`get_timer_state.php?game_id=${gameData.gameId}`);
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
                     const state = await response.json();
                     if (!state) return;
 
-                    gameClockMs = state.game_clock;
-                    
+                    if (state.running) {
+                        const elapsedMs = state.current_server_time - state.last_updated_at;
+                        gameClockMs = Math.max(0, state.game_clock - elapsedMs);
+                    } else {
+                        gameClockMs = state.game_clock;
+                    }
+
                     if (state.quarter_id !== currentQuarter) {
+                        // **FIX**: Stop the timer *before* showing the alert
+                        clearInterval(pollingInterval); 
                         alert('Quarter has changed. Refreshing the page to sync.');
                         location.reload();
-                        return;
+                        return; // Stop further execution
                     }
                     
                     document.getElementById('scoreA').textContent = state.hometeam_score;
                     document.getElementById('scoreB').textContent = state.awayteam_score;
-
+                    
                 } catch (error) {
                     console.error('State polling error:', error);
                 }
@@ -520,8 +534,6 @@ if ($teams_are_set) {
                 updateBonusUI("teamB");
                 renderInitialLog();
 
-                // FIX: Immediately calculate and update the score from loaded stats.
-                // This corrects the score display on refresh and saves the correct total.
                 updateRunningScore("teamA");
                 updateRunningScore("teamB");
 
@@ -533,27 +545,24 @@ if ($teams_are_set) {
                     });
                 }
 
-                // MODIFIED EVENT LISTENER: Uses new period logic for timeouts.
                 document.querySelectorAll(".timeout-click").forEach(el => {
                     el.addEventListener("click", async () => {
                         if (gameData.gameStatus === 'Final') return;
                         const teamKey = el.dataset.team;
                         const teamId = teamKey === 'A' ? gameData.teamA.id : gameData.teamB.id;
                         
-                        // New logic to determine the correct period for the timeout.
                         let timeoutPeriod;
                         if (currentQuarter <= 2) {
-                            timeoutPeriod = 1; // First Half
+                            timeoutPeriod = 1;
                         } else if (currentQuarter <= 4) {
-                            timeoutPeriod = 2; // Second Half
+                            timeoutPeriod = 2;
                         } else {
-                            timeoutPeriod = currentQuarter; // Each overtime is its own period
+                            timeoutPeriod = currentQuarter;
                         }
 
                         if (confirm(`Use a timeout for ${gameData[teamKey === 'A' ? 'teamA' : 'teamB'].name}?`)) {
                             const response = await fetch("use_timeout.php", {
                                 method: "POST", headers: { "Content-Type": "application/json" },
-                                // Send the correct period identifier to the backend.
                                 body: JSON.stringify({ game_id: gameData.gameId, team_id: teamId, half: timeoutPeriod })
                             });
                             const result = await response.json();
@@ -570,16 +579,16 @@ if ($teams_are_set) {
                     });
                 });
 
-                // Start polling for game state
                 fetchAndApplyState();
-                setInterval(fetchAndApplyState, 3000);
+                // **FIX**: Store the interval in our variable so we can clear it later
+                pollingInterval = setInterval(fetchAndApplyState, 1000); 
             });
         </script>
 
     <?php else: ?>
         <div class="container-message">
             <h1>Game Not Ready</h1>
-            <p>This game cannot be managed because both teams have not been assigned yet.</p>
+            <p>This game cannot be managed because either one team or both teams have not been assigned yet.</p>
             <?php if (!empty($game['category_id'])): ?>
                 <p><a href="category_details.php?category_id=<?php echo htmlspecialchars($game['category_id']); ?>&tab=schedule">Return to Schedule</a></p>
             <?php endif; ?>

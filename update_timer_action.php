@@ -25,23 +25,19 @@ try {
         echo json_encode(['success' => false, 'error' => 'Timer not initialized for this game.']);
         exit;
     }
-
-    // --- THIS IS THE FIX ---
-    // If the client sent its current time, use that as the source of truth.
-    // This prevents the "reset" behavior.
+    
+    // Use the time from the remote control as the source of truth for the clock value
     if (isset($input['game_clock'])) {
         $timer['game_clock'] = (int)$input['game_clock'];
     }
     if (isset($input['shot_clock'])) {
         $timer['shot_clock'] = (int)$input['shot_clock'];
     }
-    // --- END OF FIX ---
 
     $overtime_duration = 300 * 1000; // 5 minutes
 
     switch ($action) {
         case 'toggle':
-            // When pausing, if the clock is already at 0, don't change the running state
             if ($timer['game_clock'] > 0) {
                 $timer['running'] = !$timer['running'];
             } else {
@@ -66,20 +62,24 @@ try {
             break;
         case 'nextQuarter':
             $timer['quarter_id']++;
-            $timer['game_clock'] = $timer['quarter_id'] <= 4 ? (600 * 1000) : $overtime_duration; // Default 10 min qtrs
+            $timer['game_clock'] = $timer['quarter_id'] <= 4 ? (600 * 1000) : $overtime_duration;
             $timer['shot_clock'] = min($timer['game_clock'], 24000);
             $timer['running'] = false;
             break;
     }
 
+    // Get the current server time in milliseconds to store with the state
+    $currentTimeMs = round(microtime(true) * 1000);
+
     $update_stmt = $pdo->prepare(
-        "UPDATE game_timer SET game_clock = ?, shot_clock = ?, quarter_id = ?, running = ? WHERE game_id = ?"
+        "UPDATE game_timer SET game_clock = ?, shot_clock = ?, quarter_id = ?, running = ?, last_updated_at = ? WHERE game_id = ?"
     );
     $update_stmt->execute([
         (int)$timer['game_clock'], 
         (int)$timer['shot_clock'], 
         (int)$timer['quarter_id'], 
         (int)$timer['running'], 
+        $currentTimeMs, // ** THE FIX **: Save the timestamp with every action
         $game_id
     ]);
     
@@ -88,6 +88,9 @@ try {
     $scores = $scores_stmt->fetch(PDO::FETCH_ASSOC);
 
     $pdo->commit();
+
+    // Add the new timestamp to the state returned to the client
+    $timer['last_updated_at'] = $currentTimeMs;
 
     echo json_encode([
         'success' => true,
@@ -101,4 +104,3 @@ try {
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }
 ?>
-
