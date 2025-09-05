@@ -1,27 +1,27 @@
 <?php
-header('Content-Type: application/json');
 require_once 'db.php';
+header('Content-Type: application/json');
+
+$input = json_decode(file_get_contents('php://input'), true);
+$game_id = $input['game_id'] ?? null;
+$hometeam_score = $input['hometeam_score'] ?? 0;
+$awayteam_score = $input['awayteam_score'] ?? 0;
+
+if (!$game_id) {
+    echo json_encode(['success' => false, 'error' => 'Missing game ID.']);
+    exit;
+}
 
 try {
-    $data = json_decode(file_get_contents('php://input'), true);
-    $game_id = $data['game_id'] ?? null;
-    $hometeam_score = $data['hometeam_score'] ?? null;
-    $awayteam_score = $data['awayteam_score'] ?? null;
+    $stmt = $pdo->prepare(
+        "UPDATE game SET hometeam_score = ?, awayteam_score = ? WHERE id = ?"
+    );
+    $success = $stmt->execute([(int)$hometeam_score, (int)$awayteam_score, $game_id]);
 
-    if (!$game_id || !is_numeric($hometeam_score) || !is_numeric($awayteam_score)) {
-        echo json_encode(['success' => false, 'error' => 'Invalid input']);
-        exit;
-    }
+    echo json_encode(['success' => $success]);
 
-    $stmt = $pdo->prepare("
-        UPDATE game 
-        SET hometeam_score = ?, awayteam_score = ?
-        WHERE id = ? AND game_status != 'Final'
-    ");
-    $stmt->execute([$hometeam_score, $awayteam_score, $game_id]);
-
-    echo json_encode(['success' => true]);
-} catch (Exception $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+} catch (PDOException $e) {
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => 'Database error: ' . $e->getMessage()]);
 }
 ?>

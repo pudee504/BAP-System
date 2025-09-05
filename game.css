@@ -53,21 +53,52 @@ th {
     background-color: #f2f2f2; 
 }
 
-.stat-cell:hover .stat-controls { 
-    display: inline-flex; 
-}
-
+/* The container for the button(s), positioned to fill the cell */
 .stat-controls { 
-    display: none; 
-    gap: 4px; 
     position: absolute; 
-    right: 4px; 
-    top: 2px; 
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+
+    /* Use flexbox to perfectly center the '+' button */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    /* Hide it by default and add a fade-in effect */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease-in-out;
 }
 
-.stat-controls button { 
-    font-size: 12px; 
-    padding: 1px 5px; 
+/* Show the controls when hovering over the parent cell */
+.stat-cell:hover .stat-controls { 
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Style the '+' button to be a see-through overlay */
+.stat-controls button {
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    
+    /* This makes it "see-through" */
+    background-color: rgba(255, 255, 255, 255); 
+    border: none;
+    
+    /* Style the '+' symbol */
+    color: #000;
+    font-size: 24px;
+    font-weight: bold;
+    
+    cursor: pointer;
+}
+
+/* This rule specifically hides the second button (the '-') */
+.stat-controls button:last-child {
+    display: none;
 }
 
 .jersey-input { 
@@ -275,4 +306,41 @@ tr:has(.in-game-checkbox:checked) {
 
 #gameLogList li:last-child {
     border-bottom: none;
+}
+
+.timer-panel {
+    position: relative; /* This is required for the overlay to work */
+}
+.timer-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(230, 230, 230, 0.8);
+    backdrop-filter: blur(2px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: #333;
+    z-index: 10;
+    border-radius: 8px;
+}
+.timers-display {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 10px;
+}
+.timer-controls {
+    position: relative; /* Crucial for the overlay */
+    padding: 10px;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
 }

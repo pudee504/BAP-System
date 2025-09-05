@@ -1,62 +1,147 @@
 <?php
-// redo_specific_action.php (UPDATED AND COMPLETE)
 session_start();
-require_once 'db.php';
+header('Content-Type: application/json');
+require_once 'db.php'; // Your database connection file
 
 $data = json_decode(file_get_contents('php://input'), true);
 $log_id = $data['log_id'] ?? null;
 
 if (!$log_id) {
-    echo json_encode(['success' => false, 'error' => 'Invalid Log ID']);
+    echo json_encode(['success' => false, 'error' => 'No log ID provided.']);
     exit;
 }
 
-try {
-    // Start a transaction for safety
-    $pdo->beginTransaction();
+// Helper function to get a statistic's ID from its name
+function getStatisticId($pdo, $name) {
+    static $stat_ids = [];
+    if (isset($stat_ids[$name])) {
+        return $stat_ids[$name];
+    }
+    $stmt = $pdo->prepare("SELECT id FROM statistic WHERE statistic_name = ?");
+    $stmt->execute([$name]);
+    $result = $stmt->fetchColumn();
+    if ($result) {
+        $stat_ids[$name] = $result;
+    }
+    return $result;
+}
 
-    // Find the specific log entry by its ID
+$pdo->beginTransaction();
+
+try {
+    // 1. Fetch the log entry to be redone
     $stmt = $pdo->prepare("SELECT * FROM game_log WHERE id = ?");
     $stmt->execute([$log_id]);
-    $action_to_redo = $stmt->fetch(PDO::FETCH_ASSOC);
+    $log = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if (!$action_to_redo) {
-        throw new Exception("Action to redo not found in log.");
+    if (!$log) {
+        throw new Exception("Log entry not found.");
     }
-    
-    // Define which stats can be redone
-    $stat_map = ['1PM', '2PM', '3PM', 'FOUL', 'REB', 'AST', 'BLK', 'STL', 'TO'];
-    
-    // RE-APPLY the stat change
-    if (in_array($action_to_redo['action_type'], $stat_map)) {
-        $redo_stmt = $pdo->prepare(
-            "INSERT INTO game_statistic (game_id, player_id, team_id, statistic_id, value)
-             SELECT ?, ?, ?, s.id, 1 FROM statistic s WHERE s.statistic_name = ?
-             ON DUPLICATE KEY UPDATE value = value + 1"
-        );
-        $redo_stmt->execute([
-            $action_to_redo['game_id'],
-            $action_to_redo['player_id'],
-            $action_to_redo['team_id'],
-            $action_to_redo['action_type']
-        ]);
+    if ($log['is_undone'] == 0) {
+        throw new Exception("This action has not been undone, so it cannot be redone.");
     }
-    // (You can add more logic here for redoing timeouts, etc.)
 
-    // Mark the log entry as NOT undone
-    $update_stmt = $pdo->prepare("UPDATE game_log SET is_undone = 0 WHERE id = ?");
-    $update_stmt->execute([$action_to_redo['id']]);
+    // 2. Re-apply the action based on its type
+    $action_type = $log['action_type'];
+    $game_id = $log['game_id'];
+    $team_id = $log['team_id'];
+    $player_id = $log['player_id'];
+    $quarter = $log['quarter'];
+    $half = $quarter <= 2 ? 1 : ($quarter <= 4 ? 2 : 3);
 
-    // Commit the changes to the database
+    switch ($action_type) {
+        case 'TIMEOUT':
+            // Use the timeout again
+            $stmt = $pdo->prepare("
+                UPDATE game_timeouts 
+                SET remaining_timeouts = GREATEST(0, remaining_timeouts - 1) 
+                WHERE game_id = ? AND team_id = ? AND half = ?
+            ");
+            $stmt->execute([$game_id, $team_id, $half]);
+            break;
+
+        case 'FOUL':
+            // Increment the team's foul count
+            $stmt = $pdo->prepare("
+                UPDATE game_team_fouls 
+                SET fouls = fouls + 1 
+                WHERE game_id = ? AND team_id = ? AND quarter = ?
+            ");
+            $stmt->execute([$game_id, $team_id, $quarter]);
+
+            // Increment the player's personal foul count
+            $foul_stat_id = getStatisticId($pdo, 'FOUL');
+            if ($foul_stat_id && $player_id) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO game_statistic (game_id, player_id, team_id, statistic_id, value)
+                    VALUES (?, ?, ?, ?, 1)
+                    ON DUPLICATE KEY UPDATE value = value + 1
+                ");
+                $stmt->execute([$game_id, $player_id, $team_id, $foul_stat_id]);
+            }
+            break;
+
+        case '1PM':
+        case '2PM':
+        case '3PM':
+            $points = ($action_type === '1PM') ? 1 : (($action_type === '2PM') ? 2 : 3);
+            
+            // Increment player's point stat
+            $stat_id = getStatisticId($pdo, $action_type);
+            if ($stat_id && $player_id) {
+                 $stmt = $pdo->prepare("
+                    INSERT INTO game_statistic (game_id, player_id, team_id, statistic_id, value)
+                    VALUES (?, ?, ?, ?, 1)
+                    ON DUPLICATE KEY UPDATE value = value + 1
+                ");
+                $stmt->execute([$game_id, $player_id, $team_id, $stat_id]);
+            }
+
+            // Increment team's score
+            $gameStmt = $pdo->prepare("SELECT hometeam_id FROM game WHERE id = ?");
+            $gameStmt->execute([$game_id]);
+            $gameInfo = $gameStmt->fetch(PDO::FETCH_ASSOC);
+
+            if ($gameInfo) {
+                $score_column = ($team_id == $gameInfo['hometeam_id']) ? 'hometeam_score' : 'awayteam_score';
+                $updateScoreStmt = $pdo->prepare("
+                    UPDATE game SET $score_column = $score_column + ? WHERE id = ?
+                ");
+                $updateScoreStmt->execute([$points, $game_id]);
+            }
+            break;
+            
+        case 'REB':
+        case 'AST':
+        case 'BLK':
+        case 'STL':
+        case 'TO':
+             $stat_id = getStatisticId($pdo, $action_type);
+             if ($stat_id && $player_id) {
+                $stmt = $pdo->prepare("
+                    INSERT INTO game_statistic (game_id, player_id, team_id, statistic_id, value)
+                    VALUES (?, ?, ?, ?, 1)
+                    ON DUPLICATE KEY UPDATE value = value + 1
+                ");
+                $stmt->execute([$game_id, $player_id, $team_id, $stat_id]);
+             }
+             break;
+    }
+
+    // 3. Mark the log as active again
+    $stmt = $pdo->prepare("UPDATE game_log SET is_undone = 0 WHERE id = ?");
+    $stmt->execute([$log_id]);
+    
     $pdo->commit();
+    
+    // 4. Fetch the updated log entry to send back
+    $stmt = $pdo->prepare("SELECT * FROM game_log WHERE id = ?");
+    $stmt->execute([$log_id]);
+    $updated_log = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    // Return the updated log entry so the frontend can redraw it
-    $action_to_redo['is_undone'] = 0;
-    echo json_encode(['success' => true, 'log_entry' => $action_to_redo]);
+    echo json_encode(['success' => true, 'log_entry' => $updated_log]);
 
 } catch (Exception $e) {
-    // If anything fails, roll back all changes
     $pdo->rollBack();
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }
-?>

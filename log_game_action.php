@@ -1,34 +1,46 @@
 <?php
-// log_game_action.php
-session_start();
 require_once 'db.php';
+header('Content-Type: application/json');
 
-$data = json_decode(file_get_contents('php://input'), true);
+$input = json_decode(file_get_contents('php://input'), true);
 
-if (!$data) {
-    echo json_encode(['success' => false, 'error' => 'Invalid data']);
+if (!$input) {
+    echo json_encode(['success' => false, 'error' => 'Invalid JSON input']);
+    exit;
+}
+
+$game_id = $input['game_id'] ?? null;
+$player_id = $input['player_id'] ?? null;
+$team_id = $input['team_id'] ?? null;
+$quarter = $input['quarter'] ?? null;
+$game_clock = $input['game_clock'] ?? null; // Use the clock time sent from the browser
+$action_type = $input['action_type'] ?? null;
+$action_details = $input['action_details'] ?? null;
+
+// --- FIX: Stricter validation for all required fields ---
+if (!$game_id || !$team_id || !$quarter || !isset($game_clock) || !$action_type || !$action_details) {
+    echo json_encode(['success' => false, 'error' => 'Missing required log data from browser.']);
     exit;
 }
 
 try {
-    $sql = "INSERT INTO game_log (game_id, player_id, team_id, quarter, game_clock_ms, action_type, action_details) 
-            VALUES (:game_id, :player_id, :team_id, :quarter, :game_clock_ms, :action_type, :action_details)";
-    
-    $stmt = $pdo->prepare($sql);
-    $stmt->execute([
-        ':game_id' => $data['game_id'],
-        ':player_id' => $data['player_id'],
-        ':team_id' => $data['team_id'],
-        ':quarter' => $data['quarter'],
-        ':game_clock_ms' => $data['game_clock'],
-        ':action_type' => $data['action_type'],
-        ':action_details' => $data['action_details']
-    ]);
+    // --- FIX: Insert the log entry directly with the provided data ---
+    // No need to query the timer table here.
+    $stmt = $pdo->prepare(
+        "INSERT INTO game_log (game_id, player_id, team_id, quarter, game_clock_ms, action_type, action_details, is_undone) 
+         VALUES (?, ?, ?, ?, ?, ?, ?, 0)"
+    );
+    $stmt->execute([$game_id, $player_id, $team_id, $quarter, $game_clock, $action_type, $action_details]);
+    $log_id = $pdo->lastInsertId();
 
-    // Return the newly created log entry with its ID
-    echo json_encode(['success' => true, 'log_id' => $pdo->lastInsertId(), 'log_entry' => $data]);
+    if ($log_id) {
+        echo json_encode(['success' => true, 'log_id' => $log_id]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Failed to insert log entry.']);
+    }
 
 } catch (PDOException $e) {
-    echo json_encode(['success' => false, 'error' => $e->getMessage()]);
+    http_response_code(500);
+    echo json_encode(['success' => false, 'error' => 'Database error: ' . $e->getMessage()]);
 }
 ?>

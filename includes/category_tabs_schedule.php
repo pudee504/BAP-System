@@ -126,7 +126,7 @@
                                 <input type="datetime-local" name="game_date" required>
                                 <button type="submit">Save</button>
                             </form>
-                            <a href="manage_game.php?game_id=<?= $game['id'] ?>&category_id=<?= $category_id ?>" class="button">Manage Game</a>
+                            <a href="manager_game.php?game_id=<?= $game['id'] ?>&category_id=<?= $category_id ?>" class="button">Manage Game</a>
                         </td>
                     </tr>
                 <?php endforeach; ?>
