@@ -34,7 +34,6 @@
                 </tr>
             <?php else: ?>
                 <?php
-                // Function to convert cluster number to a letter (e.g., 1 -> A)
                 if (!function_exists('numberToLetter')) {
                     function numberToLetter($num) { return chr(64 + $num); }
                 }
@@ -47,13 +46,11 @@
 
                         <?php if (strtolower($category['format_name']) === 'round robin'): ?>
                             <td>
-                                <?php 
-                                // Fetch and display the group letter for the team
+                                <?php  
                                 if (!empty($team['cluster_id'])) {
                                     $clusterStmt = $pdo->prepare("SELECT cluster_name FROM cluster WHERE id = ?");
                                     $clusterStmt->execute([$team['cluster_id']]);
                                     $cluster_name = $clusterStmt->fetchColumn();
-                                    // Check if a name was found before converting to a letter
                                     echo $cluster_name ? numberToLetter($cluster_name) : 'N/A';
                                 } else {
                                     echo 'N/A';
@@ -62,9 +59,17 @@
                             </td>
                         <?php endif; ?>
                         <td>
-                            <a href="edit_team.php?team_id=<?= $team['id'] ?>">Edit</a> |
-                            <a href="delete_team.php?team_id=<?= $team['id'] ?>" onclick="return confirm('Are you sure?')">Delete</a>
-                        </td>
+                            <a href="edit_team.php?team_id=<?= $team['id'] ?>">Edit</a>
+                            
+                            <?php if (!$isLocked): ?>
+                                |
+                                <form action="delete_team.php" method="POST" style="display:inline;" onsubmit="return confirm('Are you sure you want to delete this team? This action cannot be undone.');">
+                                    <input type="hidden" name="team_id" value="<?= $team['id'] ?>">
+                                    <input type="hidden" name="category_id" value="<?= $category_id ?>">
+                                    <button type="submit" style="background:none; border:none; padding:0; color:blue; text-decoration:underline; cursor:pointer;">Delete</button>
+                                </form>
+                            <?php endif; ?>
+                            </td>
                     </tr>
                 <?php endforeach; ?>
             <?php endif; ?>

@@ -73,6 +73,19 @@ $players = $pdo->prepare("
 ");
 $players->execute([$team_id]);
 $player_list = $players->fetchAll();
+
+// --- ADD THIS CODE to team_details.php ---
+
+// Fetch "Free Agents" (players not on any team)
+$free_agent_stmt = $pdo->prepare("
+    SELECT p.id, p.first_name, p.last_name
+    FROM player p
+    LEFT JOIN player_team pt ON p.id = pt.player_id
+    WHERE pt.player_id IS NULL
+    ORDER BY p.last_name, p.first_name
+");
+$free_agent_stmt->execute();
+$free_agents = $free_agent_stmt->fetchAll();
 ?>
 
 <!DOCTYPE html>
@@ -112,6 +125,29 @@ $player_list = $players->fetchAll();
 
     <button class="create-league-button" type="submit">Add Player</button>
   </form>
+
+  <hr style="margin: 2rem 0;">
+
+<h2>Assign Existing Player (Free Agent)</h2>
+<?php if ($free_agents): ?>
+    <form action="assign_player.php" method="POST">
+        <input type="hidden" name="team_id" value="<?= $team_id ?>">
+        
+        <label>Select Player:</label><br>
+        <select name="player_id" required>
+            <option value="">-- Select a Free Agent --</option>
+            <?php foreach ($free_agents as $agent): ?>
+                <option value="<?= $agent['id'] ?>">
+                    <?= htmlspecialchars($agent['last_name'] . ', ' . $agent['first_name']) ?>
+                </option>
+            <?php endforeach; ?>
+        </select><br>
+
+        <button class="create-league-button" type="submit">Assign Player to Team</button>
+    </form>
+<?php else: ?>
+    <p>There are no free agents available to assign.</p>
+<?php endif; ?>
 
   <h2>Players</h2>
 <?php if ($player_list): ?>

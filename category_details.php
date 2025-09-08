@@ -16,13 +16,22 @@ if (!in_array($active_tab, $valid_tabs)) {
     $active_tab = 'teams'; // Default to 'teams' if the tab in the URL is invalid.
 }
 
-// Fetch category status to check if the schedule has been generated or the bracket is locked.
-$check = $pdo->prepare("SELECT schedule_generated, playoff_seeding_locked FROM category WHERE id = ?");
+// === START: MODIFIED CODE ===
+// Fetch all category lock statuses.
+$check = $pdo->prepare("SELECT schedule_generated, playoff_seeding_locked, groups_locked FROM category WHERE id = ?");
 $check->execute([$category_id]);
 $categoryInfo = $check->fetch(PDO::FETCH_ASSOC);
+
 $scheduleGenerated = $categoryInfo['schedule_generated'] ?? false;
-// This variable checks if the bracket positions have been locked by the user.
+
+// Specific lock variables
 $bracketLocked = $categoryInfo['playoff_seeding_locked'] ?? false;
+$groupsLocked = $categoryInfo['groups_locked'] ?? false;
+
+// A general variable to check if the category is locked in ANY way.
+$isLocked = $bracketLocked || $groupsLocked;
+// === END: MODIFIED CODE ===
+
 
 // Check if any games have a final status, which might prevent regeneration.
 $hasFinalGames = false;

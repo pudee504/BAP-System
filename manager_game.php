@@ -98,6 +98,10 @@ if ($teams_are_set) {
     $timeoutsB = loadTimeouts($pdo, $game_id, $game['awayteam_id'], $timeout_period);
 
     // --- FETCH PLAYERS ---
+    // ====================================================================================================
+    // == CORE CHANGE: This query now fetches players based on their participation in THIS game,
+    // ==              not based on the current team roster. This preserves stats for deleted players.
+    // ====================================================================================================
     $player_query = "
         SELECT 
             p.id, p.first_name, p.last_name, pg.jersey_number, pg.is_playing, pg.display_order,
@@ -110,18 +114,22 @@ if ($teams_are_set) {
             COALESCE(SUM(CASE WHEN s.statistic_name = 'BLK' THEN gs.value ELSE 0 END), 0) AS 'BLK',
             COALESCE(SUM(CASE WHEN s.statistic_name = 'STL' THEN gs.value ELSE 0 END), 0) AS 'STL',
             COALESCE(SUM(CASE WHEN s.statistic_name = 'TO' THEN gs.value ELSE 0 END), 0) AS 'TO'
-        FROM player p
-        JOIN player_team pt ON p.id = pt.player_id
-        LEFT JOIN player_game pg ON p.id = pg.player_id AND pg.game_id = ? AND pg.team_id = ?
-        LEFT JOIN game_statistic gs ON pg.player_id = gs.player_id AND pg.game_id = gs.game_id AND pg.team_id = gs.team_id
+        FROM player_game pg -- START HERE: Get players who participated in the game
+        JOIN player p ON p.id = pg.player_id -- Get their names
+        LEFT JOIN game_statistic gs ON pg.player_id = gs.player_id AND pg.game_id = gs.game_id
         LEFT JOIN statistic s ON gs.statistic_id = s.id
-        WHERE pt.team_id = ?
+        WHERE pg.game_id = ? AND pg.team_id = ? -- Filter by this game and team
         GROUP BY p.id, p.first_name, p.last_name, pg.jersey_number, pg.is_playing, pg.display_order
         ORDER BY pg.is_playing DESC, pg.display_order ASC";
+        
     $stmt = $pdo->prepare($player_query);
-    $stmt->execute([$game_id, $game['hometeam_id'], $game['hometeam_id']]);
+    
+    // ** MODIFIED EXECUTE CALL for Home Team (now uses only 2 parameters) **
+    $stmt->execute([$game_id, $game['hometeam_id']]);
     $home_players = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    $stmt->execute([$game_id, $game['awayteam_id'], $game['awayteam_id']]);
+
+    // ** MODIFIED EXECUTE CALL for Away Team (now uses only 2 parameters) **
+    $stmt->execute([$game_id, $game['awayteam_id']]);
     $away_players = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     // --- FETCH LOGS (ASCENDING order to be prepended by JS) ---

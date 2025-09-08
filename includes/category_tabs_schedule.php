@@ -6,9 +6,9 @@
     if (!$scheduleGenerated): 
     ?>
         <?php 
-        // CRITICAL CHANGE: We now check if the bracket is locked, not the old seeding system.
-        // The '$bracketLocked' variable comes from 'category_details.php'.
-        if ($bracketLocked): 
+        // === START: MODIFIED CODE ===
+        // We now use the general $isLocked variable, which works for both brackets and groups.
+        if ($isLocked): 
         ?>
             <?php 
             // Determine which generation script to call based on the tournament format.
@@ -17,20 +17,28 @@
                 $action_url = 'single_elimination.php';
             } else if ($category['format_name'] === 'Double Elimination') {
                 $action_url = 'double_elimination.php'; 
+            } else if ($category['format_name'] === 'Round Robin') {
+                // Add the case for Round Robin schedule generation
+                $action_url = 'round_robin.php';
             }
-            // You can add more format handlers here, e.g., 'generate_double_elimination.php'
-            // if ($category['format_name'] === 'Double Elimination') $action_url = 'generate_double_elimination.php';
             ?>
-            <form action="<?= $action_url ?>" method="POST" onsubmit="return confirm('This will generate the schedule based on the locked bracket. This action cannot be undone. Proceed?')">
+            <form action="<?= $action_url ?>" method="POST" onsubmit="return confirm('This will generate the schedule based on the locked settings. This action cannot be undone. Proceed?')">
                 <input type="hidden" name="category_id" value="<?= $category_id ?>">
                 <button type="submit">Generate <?= htmlspecialchars($category['format_name']) ?> Schedule</button>
             </form>
         <?php else: ?>
+            <?php
+            // Create a dynamic message based on the format.
+            $lock_type_message = (strtolower($category['format_name']) === 'round robin') 
+                ? "lock the groups" 
+                : "lock the bracket";
+            ?>
             <button type="button" disabled>Generate Schedule</button>
             <p style="color: red; font-size: 0.9em; margin-top: 5px;">
-                You must fill all team slots and lock the bracket in the 'Standings' tab before generating a schedule.
+                You must fill all team slots and <?= $lock_type_message ?> in the 'Standings' tab before generating a schedule.
             </p>
         <?php endif; ?>
+        <?php // === END: MODIFIED CODE === ?>
     <?php else: ?>
         <p style="color: green;"><strong>Schedule already generated.</strong></p>
 
@@ -55,8 +63,6 @@
         LEFT JOIN team t1 ON g.hometeam_id = t1.id
         LEFT JOIN team t2 ON g.awayteam_id = t2.id
         WHERE g.category_id = ?
-        -- MODIFIED: This ORDER BY clause now matches the graphical bracket's logic,
-        -- ensuring the Match # is consistent everywhere.
         ORDER BY 
             CASE g.bracket_type
                 WHEN 'winner' THEN 1
@@ -91,24 +97,16 @@
                         <td class="match-cell">
                             <div class="match-grid">
                                 <div class="team-name">
-                                    <?= $game['hometeam_id'] ? '<a href="team_details.php?team_id=' . $game['hometeam_id'] . '">' . htmlspecialchars($game['home_name']) . '</a>' : 'TBD' ?>
+                                    <?= $game['hometeam_id'] ? '<a href="team_details.php?team_id=' . $game['hometeam_id'] . '">' . htmlspecialchars($game['home_name'] ?? 'TBD') . '</a>' : ($game['home_placeholder'] ?? 'TBD') ?>
                                 </div>
                                 <div class="team-result <?= $game['winnerteam_id'] ? ($game['hometeam_id'] == $game['winnerteam_id'] ? 'win' : 'loss') : '' ?>">
-                                    <?php if ($game['winnerteam_id']): ?>
-                                        <?= ($game['hometeam_id'] == $game['winnerteam_id']) ? 'W' : 'L' ?>
-                                    <?php else: ?>
-                                        -
-                                    <?php endif; ?>
+                                    <?= $game['game_status'] === 'Final' ? $game['hometeam_score'] : '-' ?>
                                 </div>
                                 <div class="team-name">
-                                    <?= $game['awayteam_id'] ? '<a href="team_details.php?team_id=' . $game['awayteam_id'] . '">' . htmlspecialchars($game['away_name']) . '</a>' : 'TBD' ?>
+                                    <?= $game['awayteam_id'] ? '<a href="team_details.php?team_id=' . $game['awayteam_id'] . '">' . htmlspecialchars($game['away_name'] ?? 'TBD') . '</a>' : ($game['away_placeholder'] ?? 'TBD') ?>
                                 </div>
                                 <div class="team-result <?= $game['winnerteam_id'] ? ($game['awayteam_id'] == $game['winnerteam_id'] ? 'win' : 'loss') : '' ?>">
-                                    <?php if ($game['winnerteam_id']): ?>
-                                        <?= ($game['awayteam_id'] == $game['winnerteam_id']) ? 'W' : 'L' ?>
-                                    <?php else: ?>
-                                        -
-                                    <?php endif; ?>
+                                    <?= $game['game_status'] === 'Final' ? $game['awayteam_score'] : '-' ?>
                                 </div>
                             </div>
                         </td>
@@ -135,6 +133,6 @@
     <?php elseif ($scheduleGenerated): ?>
         <p>Games have been generated but could not be displayed. Please check the database.</p>
     <?php else: ?>
-        <p style="margin-top: 20px;">No games found. Please generate a schedule after locking the bracket.</p>
+        <p style="margin-top: 20px;">No games found. Please generate a schedule after locking the groups/bracket.</p>
     <?php endif; ?>
 </div>
