@@ -9,10 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // CSRF token validation
     if (!isset($_POST['csrf_token']) || $_POST['csrf_token'] !== $_SESSION['csrf_token']) {
         $_SESSION['error'] = 'Invalid CSRF token';
-        
-        // LOGGING: Log the CSRF failure before exiting
         log_action('CSRF_VALIDATION', 'FAILURE', 'Invalid CSRF token from login form.');
-
         header("Location: index.php");
         exit;
     }
@@ -29,9 +26,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     }
 
-    // Query the database for the user, now including role_id
-    // --- CHANGED ---
-    $stmt = $pdo->prepare("SELECT id, username, password, role_id FROM users WHERE username = :username");
+    // --- CHANGED: Modified query to JOIN the 'role' table and get the role_name ---
+    $stmt = $pdo->prepare("
+        SELECT 
+            u.id, 
+            u.username, 
+            u.password, 
+            r.role_name 
+        FROM users u
+        JOIN role r ON u.role_id = r.id
+        WHERE u.username = :username
+    ");
     $stmt->execute(['username' => $username]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -41,9 +46,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['username'] = $user['username'];
         
-        // --- ADDED ---
-        // Store the user's role in the session
-        $_SESSION['role_id'] = $user['role_id'];
+        // --- CHANGED: Store the user's role NAME, not their ID ---
+        $_SESSION['role_name'] = $user['role_name'];
 
         // LOGGING: Log the successful login
         log_action('LOGIN', 'SUCCESS');

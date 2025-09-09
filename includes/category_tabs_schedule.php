@@ -6,7 +6,6 @@
     if (!$scheduleGenerated): 
     ?>
         <?php 
-        // === START: MODIFIED CODE ===
         // We now use the general $isLocked variable, which works for both brackets and groups.
         if ($isLocked): 
         ?>
@@ -18,13 +17,12 @@
             } else if ($category['format_name'] === 'Double Elimination') {
                 $action_url = 'double_elimination.php'; 
             } else if ($category['format_name'] === 'Round Robin') {
-                // Add the case for Round Robin schedule generation
                 $action_url = 'round_robin.php';
             }
             ?>
             <form action="<?= $action_url ?>" method="POST" onsubmit="return confirm('This will generate the schedule based on the locked settings. This action cannot be undone. Proceed?')">
                 <input type="hidden" name="category_id" value="<?= $category_id ?>">
-                <button type="submit">Generate <?= htmlspecialchars($category['format_name']) ?> Schedule</button>
+                <button type="submit" class="schedule-button">Generate <?= htmlspecialchars($category['format_name']) ?> Schedule</button>
             </form>
         <?php else: ?>
             <?php
@@ -33,12 +31,11 @@
                 ? "lock the groups" 
                 : "lock the bracket";
             ?>
-            <button type="button" disabled>Generate Schedule</button>
+            <button type="button" class="schedule-button" disabled>Generate Schedule</button>
             <p style="color: red; font-size: 0.9em; margin-top: 5px;">
                 You must fill all team slots and <?= $lock_type_message ?> in the 'Standings' tab before generating a schedule.
             </p>
         <?php endif; ?>
-        <?php // === END: MODIFIED CODE === ?>
     <?php else: ?>
         <p style="color: green;"><strong>Schedule already generated.</strong></p>
 
@@ -94,22 +91,32 @@
                         <td><?= $index + 1 ?></td>
                         <td><?= htmlspecialchars($game['round_name'] ?: 'Round ' . $game['round']) ?></td>
                         
+                        <!-- REQUIRED CHANGE: This entire 'td' block is from your previous version to restore the W/L display -->
                         <td class="match-cell">
                             <div class="match-grid">
                                 <div class="team-name">
-                                    <?= $game['hometeam_id'] ? '<a href="team_details.php?team_id=' . $game['hometeam_id'] . '">' . htmlspecialchars($game['home_name'] ?? 'TBD') . '</a>' : ($game['home_placeholder'] ?? 'TBD') ?>
+                                    <?= $game['hometeam_id'] ? '<a href="team_details.php?team_id=' . $game['hometeam_id'] . '">' . htmlspecialchars($game['home_name']) . '</a>' : 'TBD' ?>
                                 </div>
                                 <div class="team-result <?= $game['winnerteam_id'] ? ($game['hometeam_id'] == $game['winnerteam_id'] ? 'win' : 'loss') : '' ?>">
-                                    <?= $game['game_status'] === 'Final' ? $game['hometeam_score'] : '-' ?>
+                                    <?php if ($game['winnerteam_id']): ?>
+                                        <?= ($game['hometeam_id'] == $game['winnerteam_id']) ? 'W' : 'L' ?>
+                                    <?php else: ?>
+                                        -
+                                    <?php endif; ?>
                                 </div>
                                 <div class="team-name">
-                                    <?= $game['awayteam_id'] ? '<a href="team_details.php?team_id=' . $game['awayteam_id'] . '">' . htmlspecialchars($game['away_name'] ?? 'TBD') . '</a>' : ($game['away_placeholder'] ?? 'TBD') ?>
+                                    <?= $game['awayteam_id'] ? '<a href="team_details.php?team_id=' . $game['awayteam_id'] . '">' . htmlspecialchars($game['away_name']) . '</a>' : 'TBD' ?>
                                 </div>
                                 <div class="team-result <?= $game['winnerteam_id'] ? ($game['awayteam_id'] == $game['winnerteam_id'] ? 'win' : 'loss') : '' ?>">
-                                    <?= $game['game_status'] === 'Final' ? $game['awayteam_score'] : '-' ?>
+                                    <?php if ($game['winnerteam_id']): ?>
+                                        <?= ($game['awayteam_id'] == $game['winnerteam_id']) ? 'W' : 'L' ?>
+                                    <?php else: ?>
+                                        -
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </td>
+                        
                         <td>
                             <?= ($game['game_status'] === 'Final' || $game['winnerteam_id']) ? 'Final' : 'Pending' ?>
                         </td>

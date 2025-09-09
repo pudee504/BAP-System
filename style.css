@@ -116,7 +116,7 @@ body.login-page .login-container {
   }
   
  .dashboard-container {
-    max-width: 800px;
+    max-width: 1200px;
     margin: 2rem auto;
     background: white;
     color: black;
@@ -339,6 +339,14 @@ select,
   border-left: 1px solid #ccc;
 }
 
-
+.schedule-button {
+  padding: 10px 15px;
+  background-color: #ff6b00;
+  color: white;
+  border: none;
+  cursor: pointer;
+  border-radius: 8px;
+  font-weight: bold;
+}
 
 

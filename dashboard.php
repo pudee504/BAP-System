@@ -10,29 +10,34 @@ if (!isset($_SESSION['user_id'])) {
 include 'db.php';
 
 $user_id = $_SESSION['user_id'];
-$role_id = $_SESSION['role_id'];
+// --- CHANGED: We now get the role NAME from the session, not the ID ---
+$user_role = $_SESSION['role_name']; 
 $params = [];
 $leagues = [];
+$query = ''; // Initialize the query variable to prevent errors
 
-if ($role_id == 1) {
+// --- CHANGED: The logic now checks for the role NAME ('Admin') ---
+if ($user_role === 'Admin') {
     // --- User is an ADMIN ---
-    // MODIFIED: Changed the sorting order to show oldest leagues first.
     $query = "SELECT * FROM league ORDER BY id ASC";
 
-} elseif ($role_id == 2) {
-    // --- User is LEAGUE STAFF ---
+} else { // Covers any other role, like 'League Manager' or 'League Staff'
+    // --- User is LEAGUE STAFF or another non-admin role ---
     $query = "SELECT l.*, GROUP_CONCAT(lma.assignment_id) AS assignments
               FROM league l
               JOIN league_manager_assignment lma ON l.id = lma.league_id
               WHERE lma.user_id = :user_id
               GROUP BY l.id 
-              ORDER BY l.id ASC"; // MODIFIED: Changed the sorting order here as well.
+              ORDER BY l.id ASC";
     $params['user_id'] = $user_id;
 }
 
-$stmt = $pdo->prepare($query);
-$stmt->execute($params);
-$leagues = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// This section will now work because $query is always set
+if (!empty($query)) {
+    $stmt = $pdo->prepare($query);
+    $stmt->execute($params);
+    $leagues = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
 
 ?>
 
@@ -66,7 +71,7 @@ $leagues = $stmt->fetchAll(PDO::FETCH_ASSOC);
             box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
         }
         .search-container::before {
-            /* Search icon (you can use an SVG or font icon too) */
+            /* Search icon */
             content: '🔍';
             position: absolute;
             left: 15px;
@@ -76,9 +81,9 @@ $leagues = $stmt->fetchAll(PDO::FETCH_ASSOC);
             color: #888;
         }
     </style>
-    </head>
+</head>
 <body>
-<?php include 'includes/header.php'; ?>
+<?php include 'includes/header.php'; // Corrected path if it's not in an includes folder ?>
 
 <div class="dashboard-container">
     <h1 style="margin-bottom: 20px">Leagues</h1>
@@ -86,7 +91,9 @@ $leagues = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <div class="search-container">
         <input type="text" id="leagueSearchInput" placeholder="Search leagues...">
     </div>
-    <?php if ($role_id == 1): ?>
+    
+    <!-- --- CHANGED: Check against the role name variable --- -->
+    <?php if ($user_role === 'Admin'): ?>
         <a href="create_league.php" class="create-league-button">+ Create League</a>
     <?php endif; ?>
     
@@ -113,7 +120,8 @@ $leagues = $stmt->fetchAll(PDO::FETCH_ASSOC);
                             <td><?= htmlspecialchars($league['status']) ?></td>
                             <td>
                                 <?php
-                                $hasManagerPermission = ($role_id == 1) || (isset($league['assignments']) && in_array('1', explode(',', $league['assignments'])));
+                                // --- CHANGED: Check against the role name variable ---
+                                $hasManagerPermission = ($user_role === 'Admin') || (isset($league['assignments']) && in_array('1', explode(',', $league['assignments'])));
                                 ?>
 
                                 <?php if ($hasManagerPermission): ?>
@@ -132,7 +140,8 @@ $leagues = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <tr class="no-results">
                         <td colspan="4">
                             <div class="no-results-message">
-                                <?php if ($role_id == 2): ?>
+                                <!-- --- CHANGED: Check against the role name variable --- -->
+                                <?php if ($user_role !== 'Admin'): ?>
                                     You have not been assigned to any leagues.
                                 <?php else: ?>
                                     No leagues found.
@@ -147,10 +156,11 @@ $leagues = $stmt->fetchAll(PDO::FETCH_ASSOC);
 </div>
 
 <script>
+// Your JavaScript for live search remains unchanged as it is correct.
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('leagueSearchInput');
     const tableBody = document.getElementById('leaguesTableBody');
-    const allRows = tableBody.querySelectorAll('tr:not(#no-results-row)'); // Get all data rows
+    const allRows = tableBody.querySelectorAll('tr:not(#no-results-row)');
     const noResultsRow = document.getElementById('no-results-row');
 
     searchInput.addEventListener('keyup', function() {
@@ -158,10 +168,8 @@ document.addEventListener('DOMContentLoaded', function() {
         let visibleRows = 0;
 
         allRows.forEach(row => {
-            // Get the text from the first cell (League Name)
             const leagueName = row.cells[0].textContent.toLowerCase();
             
-            // If the league name includes the search term, show it. Otherwise, hide it.
             if (leagueName.includes(searchTerm)) {
                 row.style.display = '';
                 visibleRows++;
@@ -170,12 +178,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        // Show or hide the "No results" message based on visibility
-        if (visibleRows === 0) {
-            noResultsRow.style.display = ''; // Use table-row if your CSS is specific
-        } else {
-            noResultsRow.style.display = 'none';
-        }
+        noResultsRow.style.display = (visibleRows === 0) ? '' : 'none';
     });
 });
 </script>
