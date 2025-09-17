@@ -32,7 +32,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             // --- DETAILED SUCCESS LOGGING ---
             $changes = [];
-            // Compare old values from $league with new values from the form
             if ($league['league_name'] !== $league_name) {
                 $changes[] = "name from '{$league['league_name']}' to '{$league_name}'";
             }
@@ -47,7 +46,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $log_details = "Updated league '{$league['league_name']}' (ID: {$league_id}): changed " . implode(', ', $changes) . ".";
                 log_action('UPDATE_LEAGUE', 'SUCCESS', $log_details);
             } else {
-                // Optional: Log when user clicks update but makes no changes
                 $log_details = "Submitted update for league '{$league['league_name']}' (ID: {$league_id}) with no changes.";
                 log_action('UPDATE_LEAGUE', 'INFO', $log_details);
             }
@@ -62,7 +60,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         exit;
     } else {
         $error = "All fields are required.";
-        // --- FAILURE LOGGING ---
         $log_details = "Failed to update league '{$league['league_name']}' (ID: {$league_id}) due to missing fields.";
         log_action('UPDATE_LEAGUE', 'FAILURE', $log_details);
     }
@@ -70,36 +67,45 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edit League</title>
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="login-page">
-<div class="login-container">
+<body>
+<?php include 'includes/header.php'; ?>
+<div class="form-container">
     <h1>Edit League</h1>
 
     <?php if (!empty($error)): ?>
-        <p style="color:red"><?= htmlspecialchars($error) ?></p>
+        <div class="form-error"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
 
-    <form method="POST">
-        <label>League Name:</label><br>
-        <input type="text" name="league_name" value="<?= htmlspecialchars($league['league_name']) ?>" required><br>
+    <form method="POST" action="edit_league.php?id=<?= $league_id ?>">
+        <div class="form-group">
+            <label for="league_name">League Name</label>
+            <input type="text" id="league_name" name="league_name" value="<?= htmlspecialchars($league['league_name']) ?>" required>
+        </div>
 
-        <label>Location:</label><br>
-        <input type="text" name="location" value="<?= htmlspecialchars($league['location']) ?>" required><br>
+        <div class="form-group">
+            <label for="location">Location</label>
+            <input type="text" id="location" name="location" value="<?= htmlspecialchars($league['location']) ?>" required>
+        </div>
 
-        <label>Status:</label><br>
-        <select name="status" required>
-            <option value="Upcoming" <?= $league['status'] === 'Upcoming' ? 'selected' : '' ?>>Upcoming</option>
-            <option value="Active" <?= $league['status'] === 'Active' ? 'selected' : '' ?>>Active</option>
-            <option value="Completed" <?= $league['status'] === 'Completed' ? 'selected' : '' ?>>Completed</option>
-        </select><br><br>
+        <div class="form-group">
+            <label for="status">Status</label>
+            <select id="status" name="status" required>
+                <option value="Upcoming" <?= $league['status'] === 'Upcoming' ? 'selected' : '' ?>>Upcoming</option>
+                <option value="Active" <?= $league['status'] === 'Active' ? 'selected' : '' ?>>Active</option>
+                <option value="Completed" <?= $league['status'] === 'Completed' ? 'selected' : '' ?>>Completed</option>
+            </select>
+        </div>
 
-        <button type="submit">Update League</button>
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Update League</button>
+        </div>
     </form>
 </div>
 </body>

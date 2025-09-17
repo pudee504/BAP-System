@@ -9,18 +9,151 @@ if (!$game_id) { die("Invalid game ID."); }
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Game Timer Control</title>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #1c1c1e; color: #fff; text-align: center; margin: 0; padding: 10px; }
-        .container { max-width: 480px; margin: 0 auto; }
-        .game-clock { font-size: 5em; font-weight: bold; font-family: "Courier New", monospace; letter-spacing: -3px; }
-        .shot-clock { font-size: 3.5em; color: #ffc107; font-family: "Courier New", monospace; }
-        .quarter { font-size: 1.5em; margin-bottom: 10px; color: #aaa; }
-        button { font-size: 1.1em; padding: 12px 20px; margin: 5px; cursor: pointer; border-radius: 8px; border: none; min-width: 150px; background-color: #3a3a3c; color: #fff; transition: background-color 0.2s; }
-        button:active { background-color: #555; }
-        button:disabled { background-color: #2c2c2e; color: #666; cursor: not-allowed; }
-        #toggleClockBtn { background-color: #34c759; font-weight: bold; width: 90%; padding: 15px; }
-        #toggleClockBtn.running { background-color: #ff3b30; }
-        .control-group { margin: 20px 0; border-top: 1px solid #3a3a3c; padding-top: 20px; }
-        .control-group h4 { margin-top: 0; color: #aaa; }
+        /* ==========================================================================
+           1. THEME VARIABLES & GENERAL RESET
+           ========================================================================== */
+        :root {
+            --bap-blue: #1f2593;
+            --bap-orange: #fc9e3e;
+            --bap-yellow: #FFC107;
+            --bap-red: #D81B60;
+            --text-dark: #212529;
+            --text-light: #f8f9fa;
+            --bg-light: #ffffff;
+            --bg-main: #f4f7fc;
+            --border-color: #dee2e6;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-main);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 1rem;
+        }
+
+        /* ==========================================================================
+           2. MAIN CONTAINER & TYPOGRAPHY
+           ========================================================================== */
+        .container {
+            max-width: 480px;
+            margin: 0 auto;
+            background: var(--bg-light);
+            padding: 1.5rem;
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            text-align: center;
+        }
+        
+        h1 {
+            color: var(--bap-blue);
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .quarter {
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+            color: #6c757d;
+            font-weight: 600;
+        }
+
+        .game-clock {
+            font-size: 4.5em;
+            font-weight: bold;
+            font-family: "Courier New", monospace;
+            color: var(--text-dark);
+            letter-spacing: -2px;
+        }
+
+        .shot-clock {
+            font-size: 3em;
+            color: var(--bap-orange);
+            font-family: "Courier New", monospace;
+            font-weight: bold;
+            margin-bottom: 1.5rem;
+        }
+
+        /* ==========================================================================
+           3. BUTTONS & CONTROLS
+           ========================================================================== */
+        button {
+            display: inline-block;
+            padding: 0.75rem 1rem;
+            border: none;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+            margin: 0.25rem;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+
+        button:disabled {
+            background-color: #e9ecef !important; /* Use important to override other styles */
+            color: #6c757d !important;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        #toggleClockBtn {
+            width: 90%;
+            padding: 1rem;
+            font-size: 1.2rem;
+            background-color: #28a745; /* A clear green for "Start" */
+            color: var(--text-light);
+        }
+
+        #toggleClockBtn.running {
+            background-color: var(--bap-red);
+        }
+        
+        .control-group button {
+             background-color: var(--bap-blue);
+             color: var(--text-light);
+             width: calc(50% - 1rem); /* Creates a 2-column layout for buttons */
+        }
+
+        #finalizeGameBtn {
+            background-color: var(--bap-orange);
+            color: var(--text-dark);
+            width: 90%;
+        }
+
+        /* ==========================================================================
+           4. LAYOUT
+           ========================================================================== */
+        .main-controls {
+            margin-bottom: 1.5rem;
+        }
+
+        .control-group {
+            margin: 1.5rem 0 0 0;
+            border-top: 1px solid var(--border-color);
+            padding-top: 1.5rem;
+        }
+
+        .control-group h4 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            color: #6c757d;
+            font-weight: 600;
+        }
+
     </style>
 </head>
 <body>
@@ -36,15 +169,16 @@ if (!$game_id) { die("Invalid game ID."); }
         </div>
         <div class="control-group">
             <h4>Possession</h4>
-            <button onclick="sendAction('resetShotClock', { isOffensive: false })">Change (24s)</button>
-            <button onclick="sendAction('resetShotClock', { isOffensive: true })">Off. Reb (14s)</button>
+            <button onclick="sendAction('resetShotClock', { isOffensive: false })">Change Possesion (24s)</button>
+            <button onclick="sendAction('resetShotClock', { isOffensive: true })">Same Posession (14s)</button>
         </div>
         <div class="control-group">
             <h4>Game Clock Adjust</h4>
             <button onclick="sendAction('adjustGameClock', { value: 60000 })">+1m</button>
             <button onclick="sendAction('adjustGameClock', { value: 1000 })">+1s</button>
-            <button onclick="sendAction('adjustGameClock', { value: -1000 })">-1s</button>
             <button onclick="sendAction('adjustGameClock', { value: -60000 })">-1m</button>
+            <button onclick="sendAction('adjustGameClock', { value: -1000 })">-1s</button>
+            
         </div>
         <div class="control-group">
             <h4>Shot Clock Adjust</h4>
@@ -54,7 +188,7 @@ if (!$game_id) { die("Invalid game ID."); }
         <div class="control-group">
             <h4>Game Flow</h4>
             <button id="nextQuarterBtn" onclick="sendAction('nextQuarter')">Next Quarter</button>
-            <button id="finalizeGameBtn" onclick="finalizeGame()" style="display:none; background-color: #007bff; color: white;">Finalize Game</button>
+            <button id="finalizeGameBtn" onclick="finalizeGame()" style="display:none;">Finalize Game</button>
         </div>
     </div>
 
@@ -120,13 +254,9 @@ if (!$game_id) { die("Invalid game ID."); }
 
         async function sendAction(action, payload = {}) {
             try {
-                // --- THIS IS THE FIX ---
-                // We now include the current time from this device in the message to the server.
-                // This makes the server's calculation start from the correct time.
                 const body = { 
                     game_id: gameId, 
                     action: action, 
-                    // Send the current time from this client
                     game_clock: gameClockMs, 
                     shot_clock: shotClockMs,
                     ...payload 
@@ -176,7 +306,6 @@ if (!$game_id) { die("Invalid game ID."); }
 
                 if (result.success) {
                     alert('Game has been finalized successfully! The winner will now be displayed on the management page.');
-                    // Disable all controls on this page since the game is over
                     document.querySelectorAll('button').forEach(btn => btn.disabled = true);
                     document.getElementById('toggleClockBtn').textContent = 'Game Over';
                     document.getElementById('toggleClockBtn').classList.remove('running');
@@ -188,7 +317,6 @@ if (!$game_id) { die("Invalid game ID."); }
                 alert('A network error occurred while trying to finalize the game.');
             }
         }
-        // --- END OF NEW FUNCTION ---
         
         function runLocalTimer() {
             if (localTimerInterval) clearInterval(localTimerInterval);

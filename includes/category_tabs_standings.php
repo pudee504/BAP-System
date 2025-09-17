@@ -8,13 +8,15 @@
     if ($is_bracket_format): 
     ?>
     
-        <h2>Bracket Setup</h2>
+        <div class="section-header">
+            <h2>Bracket Setup</h2>
+        </div>
 
         <?php 
         // Show a message if not all teams have been added yet.
         if (!$all_slots_filled): 
         ?>
-            <p>Please add all <?= $category['num_teams'] ?> teams in the 'Teams' tab before setting up the bracket.</p>
+            <p class="info-message">Please add all <?= $category['num_teams'] ?> teams in the 'Teams' tab before setting up the bracket.</p>
         
         <?php 
         // Otherwise, show the correct bracket visualizer.
@@ -36,12 +38,10 @@
     // --- THIS PART HANDLES NON-BRACKET FORMATS (ROUND ROBIN) ---
     else: 
     ?>
-
         <?php 
         // This single line now loads the entire standings table from the other file.
         require 'includes/round_robin_standings.php'; 
         ?>
-
     <?php endif; ?>
 
 </div>

@@ -1,346 +1,316 @@
-body { 
-    font-family: Arial, sans-serif; 
-    padding: 20px; 
+/* ==========================================================================
+   MANAGE GAME PAGE STYLES
+   ========================================================================== */
+
+/* --- Main Layout --- */
+.game-manager-container {
+    max-width: 98%; 
+    margin: 1rem auto;
+    padding: 1.5rem;
+    background: var(--bg-light);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
 }
 
-.teams-container { 
-    display: flex; 
-    justify-content: space-between; 
-    gap: 20px; 
-}
-
-.team-box { 
-    width: 49%; 
-    border: 1px solid #ccc; 
-    border-radius: 8px; 
-    padding: 10px; 
-}
-
-.team-header { 
-    font-weight: bold; 
-    text-align: center; 
-    margin-bottom: 10px; 
-}
-
-.score-line {
+/* --- Scoreboard --- */
+.score-display {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    font-weight: bold;
-    margin-bottom: 5px;
+    background-color: var(--bap-blue);
+    color: var(--text-light);
+    padding: 0.5rem 1.5rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 4px 15px rgba(31, 37, 147, 0.3);
 }
 
-.score-value {
-    font-size: 24px;
-    font-weight: bold;
-    color: #333;
-}
-
-table { 
-    width: 100%; 
-    border-collapse: collapse; 
-    font-size: 14px; 
-}
-
-th, td { 
-    border: 1px solid #ddd; 
-    padding: 4px; 
-    text-align: center; 
-    position: relative; 
-}
-
-th { 
-    background-color: #f2f2f2; 
-}
-
-/* The container for the button(s), positioned to fill the cell */
-.stat-controls { 
-    position: absolute; 
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-
-    /* Use flexbox to perfectly center the '+' button */
+.team-info {
+    flex: 1;
     display: flex;
-    justify-content: center;
     align-items: center;
+    gap: 1rem;
+}
+.team-info.home {
+    justify-content: flex-start;
+}
+.team-info.away {
+    justify-content: flex-end;
+}
 
-    /* Hide it by default and add a fade-in effect */
+.team-name-link {
+    text-decoration: none;
+    color: var(--text-light);
+}
+.team-name {
+    font-size: 1.5rem;
+    font-weight: bold;
+    transition: color 0.3s ease;
+}
+.team-name-link:hover .team-name {
+    color: var(--bap-yellow);
+}
+
+.score-display .winner-label {
+    font-size: 1rem;
+    font-weight: bold;
+    color: var(--bap-yellow);
+    background-color: rgba(255, 255, 255, 0.1);
+    padding: 0.25rem 0.75rem;
+    border-radius: 50px;
+    visibility: hidden;
+}
+
+.scores {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    font-family: 'Courier New', Courier, monospace;
+}
+.score {
+    font-size: 4rem;
+    font-weight: bold;
+}
+.separator {
+    font-size: 3rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* --- Teams Container & Tables --- */
+.teams-container {
+    display: grid;
+    /* This creates the two-column layout for the tables */
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+}
+
+/* On smaller screens, stack the tables vertically */
+@media (max-width: 1200px) {
+    .teams-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+.team-box {
+    background: var(--bg-light);
+    border: none;
+    padding: 0;
+}
+.team-stats-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 1.5rem;
+    background-color: #f8f9fa;
+    border: 1px solid var(--border-color);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    font-weight: 600;
+}
+.bonus-indicator {
+    color: var(--bap-red);
+    margin-left: 0.5rem;
+}
+.timeout-click {
+    background-color: var(--bap-blue);
+    color: var(--text-light);
+}
+.timeout-click:hover {
+    background-color: #161b6f;
+}
+.timeout-click:disabled {
+    background-color: #e9ecef;
+    color: #6c757d;
+}
+
+.team-box .table-wrapper {
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 0 0 8px 8px;
+}
+
+.team-box table {
+    font-size: 0.70rem; /* Slightly reduced from 0.875rem for more space */
+    table-layout: fixed;
+    width: 100%;
+}
+.team-box table th {
+    padding: 0.5rem;
+    white-space: nowrap;
+}
+.team-box table td {
+    padding: 0.4rem;
+    vertical-align: middle;
+}
+
+/* Column width adjustments */
+.team-box table th:nth-child(1), .team-box table td:nth-child(1) { width: 35px; } /* In */
+.team-box table th:nth-child(2), .team-box table td:nth-child(2) { width: 70px; } /* # - Changed from 70px */
+.team-box table th:nth-child(3), .team-box table td:nth-child(3) { width: auto; } /* Name */
+.team-box table th:nth-child(n+4):nth-child(-n+12) { width: 37px; } /* Stats */
+.team-box table th:nth-child(13), .team-box table td:nth-child(13) { width: 30px; } /* PTS */
+
+
+/* --- Player Roster Styles --- */
+.name-cell {
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.jersey-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.5rem 0.25rem;
+    text-align: center;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: #fdfdff;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    position: relative; 
+    z-index: 5;
+}
+.jersey-input:focus {
+    outline: none;
+    border-color: var(--bap-blue);
+    box-shadow: 0 0 0 2px rgba(31, 37, 147, 0.2);
+}
+
+tr:has(.in-game-checkbox:checked) {
+    background-color: #e9f5ff;
+}
+tr:has(.in-game-checkbox:checked) .name-cell {
+    font-weight: bold;
+}
+.total-points {
+    font-weight: bold;
+    background-color: #f8f9fa;
+}
+
+/* Stat hover overlay */
+.stat-cell {
+    position: relative;
+    text-align: center;
+}
+.stat-controls {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    display: none; /* Changed from display:flex to none initially */
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(233, 245, 255, 0.85);
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.2s ease-in-out;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
 }
-
-/* Show the controls when hovering over the parent cell */
-.stat-cell:hover .stat-controls { 
+.stat-cell:hover .stat-controls {
+    display: flex; /* Display on hover */
     opacity: 1;
     visibility: visible;
 }
-
-/* Style the '+' button to be a see-through overlay */
-.stat-controls button {
-    width: 100%;
-    height: 100%;
+.stat-controls .btn-stat-add {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid #155724;
+    background-color: #d4edda;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #155724;
+    cursor: pointer;
+    line-height: 26px;
     padding: 0;
-    
-    /* This makes it "see-through" */
-    background-color: rgba(255, 255, 255, 255); 
-    border: none;
-    
-    /* Style the '+' symbol */
-    color: #000;
-    font-size: 24px;
-    font-weight: bold;
-    
-    cursor: pointer;
 }
-
-/* This rule specifically hides the second button (the '-') */
-.stat-controls button:last-child {
-    display: none;
+.stat-controls .btn-stat-add:hover {
+    background-color: #b8e0c2;
 }
-
-.jersey-input { 
-    width: 50px; 
-    text-align: center; 
-}
-
-.in-game-checkbox { 
-    cursor: pointer; 
-}
-
-tr:has(.in-game-checkbox:checked) { 
-    background-color: #e0ffe0; 
-}
-
-
-
-.timer-panel {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 10px 0;
-    background-color: #f9f9f9;
-    border-bottom: 1px solid #ddd;
-}
-
-.timer-panel .quarter {
-    font-size: 18px;
-    font-weight: bold;
-    margin-bottom: 5px;
-}
-
-.timer-panel .timers {
-    display: flex;
-    gap: 20px;
-    font-size: 32px;
-    font-weight: bold;
-}
-
-.timer-panel .game-clock,
-.timer-panel .shot-clock {
-    padding: 6px 16px;
-    border: 2px solid #333;
-    border-radius: 6px;
-    background-color: #fff;
-}
-
-.fixed-header {
-    position: sticky;
-    top: 0;
-    background-color: white;
-    padding: 10px 0;
-    z-index: 1000;
-    border-bottom: 2px solid #ddd;
-}
-
-.timers {
-    display: flex;
-    gap: 40px;
-    font-size: 32px;
-    font-weight: bold;
-    align-items: center;
-    justify-content: center;
-}
-
-.clock-control {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-}
-
-.adjust-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.adjust-buttons button {
-    width: 32px;
-    height: 32px;
-    font-size: 20px;
-    line-height: 1;
-    cursor: pointer;
-    border: 1px solid #ccc;
-    background-color: #f2f2f2;
-    border-radius: 4px;
-}
-
-.timeout-click {
-    padding: 4px 10px;
-    font-size: 14px;
-    font-weight: bold;
-    background-color: #007bff;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background-color 0.2s ease;
-}
-
-.timeout-click:hover {
-    background-color: #0056b3;
-}
-
-.timeout-click:disabled {
-    background-color: #999;
+.stat-controls button:disabled {
     cursor: not-allowed;
-}
-.name-cell {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 160px;
-  display: inline-block;
-}
-.score-display {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-size: 24px;
-  font-weight: bold;
-  gap: 30px;
-  padding: 12px 0;
-  border-bottom: 1px solid #ccc;
-}
-
-.team-name-box {
-  display: flex;
-  align-items: center;
-  min-width: 140px;
-}
-
-.team-name-box.left {
-  justify-content: flex-end;
-  gap: 8px; /* Space between label and name */
-  flex-direction: row; /* Label on the left of name */
-}
-
-.team-name-box.right {
-  justify-content: flex-start;
-  gap: 8px; /* Space between name and label */
-  flex-direction: row; /* Name on left, label on right */
-}
-
-.winner-label {
-  color: green;
-  font-weight: bold;
-  font-size: 18px;
-  display: inline-block;
-  min-width: 150px; /* enough space for the longest expected winner name */
+    background-color: #eee;
+    border-color: #ddd;
+    color: #ccc;
 }
 
 
-.team-name {
-  white-space: nowrap;
-}
-
-.score {
-  font-size: 32px;
-  min-width: 40px;
-  text-align: center;
-}
-
-.separator {
-  font-size: 28px;
-  padding: 0 10px;
-}
-
+/* --- Game Log --- */
 .game-log-container {
-    /* Set a width. 90% is good for responsiveness. */
-    width: 90%;
-    
-    /* Set a max-width so it doesn't get too wide on large screens. */
-    max-width: 800px; 
-    
-    /* This is the key part: auto margins on left/right will center it. */
-    margin: 40px auto; /* Adds 40px of space on top/bottom and centers it horizontally */
-    
-    /* Optional: Add some styling to the box itself. */
-    border: 1px solid #ccc;
-    border-radius: 8px;
-    padding: 10px 20px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin-top: 2.5rem;
 }
-
-.game-log-container h2 {
-    text-align: center; /* Centers the "Game Log" title */
-    margin-top: 10px;
-}
-
 #gameLogList {
-    list-style-type: none; /* Removes the default bullet points */
-    padding: 0;
-    max-height: 400px; /* Gives the log a max height with a scrollbar */
-    overflow-y: auto; /* Adds a scrollbar if the content overflows */
+    list-style-type: none;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+    background-color: #fdfdff;
 }
-
 #gameLogList li {
     display: flex;
-    justify-content: space-between; /* Puts space between the text and the button */
+    justify-content: space-between;
     align-items: center;
-    padding: 8px 10px;
-    border-bottom: 1px solid #eee;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid #f1f1f1;
 }
-
 #gameLogList li:last-child {
     border-bottom: none;
 }
+#gameLogList li.undone {
+    text-decoration: line-through;
+    color: #888;
+}
 
-.timer-panel {
-    position: relative; /* This is required for the overlay to work */
+/* --- Control Panel (QR Code & Override) --- */
+.control-panel {
+    gap: 2rem;
+    margin-top: 2.5rem;
 }
-.timer-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(230, 230, 230, 0.8);
-    backdrop-filter: blur(2px);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    font-size: 1.2em;
-    font-weight: bold;
-    color: #333;
-    z-index: 10;
+.qr-code-container h4 {
+    margin: 0 0 0.5rem 0;
+    color: var(--text-dark);
+}
+.qr-code-container img {
+    width: 120px;
+    height: 120px;
     border-radius: 8px;
+    border: 2px solid var(--border-color);
 }
-.timers-display {
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 20px;
-    margin-bottom: 10px;
+.override-panel {
+    background-color: #f8f9fa;
+    padding: 1.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin: 2rem auto 0 auto;
+    max-width: 400px;
 }
-.timer-controls {
-    position: relative; /* Crucial for the overlay */
-    padding: 10px;
-    border-top: 1px solid #eee;
+.override-panel .form-group {
     display: flex;
-    justify-content: center;
     align-items: center;
-    gap: 15px;
+    justify-content: center;
+    gap: 1rem;
+}
+.override-panel label {
+    margin-bottom: 0;
+}
+.override-panel select {
+    min-width: 200px;
+}
+
+/* --- Not Ready Message --- */
+.container-message {
+    text-align: center;
+    padding: 3rem;
+}
+.container-message h1 {
+    color: var(--bap-blue);
+    margin-bottom: 1rem;
+}
+.container-message p {
+    color: #6c757d;
+    font-size: 1.2em;
+    margin-bottom: 2rem;
+}
+.container-message a {
+    color: var(--bap-orange);
 }

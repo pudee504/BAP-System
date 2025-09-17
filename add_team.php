@@ -38,16 +38,10 @@ $num_groups = (int) $info['num_groups'];
 $is_bracket_format = in_array(strtolower($format_name), ['single elimination', 'double elimination']);
 $is_round_robin = strtolower($format_name) === 'round robin';
 
-$current_count = 0;
-if ($is_bracket_format) {
-    $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM bracket_positions WHERE category_id = ? AND team_id IS NOT NULL");
-    $checkStmt->execute([$category_id]);
-    $current_count = (int) $checkStmt->fetchColumn();
-} else {
-    $checkStmt = $pdo->prepare("SELECT COUNT(*) FROM team WHERE category_id = ?");
-    $checkStmt->execute([$category_id]);
-    $current_count = (int) $checkStmt->fetchColumn();
-}
+// Get the current count of teams already in the category.
+$checkStmt = $pdo->prepare("SELECT COUNT(*) FROM team WHERE category_id = ?");
+$checkStmt->execute([$category_id]);
+$current_count = (int) $checkStmt->fetchColumn();
 
 if ($current_count >= $max_teams) {
     $log_details = "Failed to add team '{$team_name}' to category '{$category_name}' (ID: {$category_id}) because the team limit ({$max_teams}) was reached.";
@@ -62,55 +56,71 @@ try {
     $insert->execute([$category_id, $team_name]);
     $team_id = $pdo->lastInsertId();
 
-    if ($is_bracket_format) {
-        // === START: NEW LOGIC TO CREATE SLOTS IF THEY DON'T EXIST ===
-        // First, check if bracket slots have been created for this category yet.
-        $slotCheckStmt = $pdo->prepare("SELECT COUNT(*) FROM bracket_positions WHERE category_id = ?");
-        $slotCheckStmt->execute([$category_id]);
-        $slot_count = $slotCheckStmt->fetchColumn();
+    // **FIXED & ROBUST LOGIC FOR ROUND ROBIN GROUP ASSIGNMENT**
+    if ($is_round_robin && $num_groups > 0) {
+        
+        // 1. Check if the existing clusters are valid.
+        $clusterCheckStmt = $pdo->prepare("SELECT cluster_name FROM cluster WHERE category_id = ?");
+        $clusterCheckStmt->execute([$category_id]);
+        $existing_clusters = $clusterCheckStmt->fetchAll(PDO::FETCH_COLUMN);
 
-        // If no slots exist, this is a new bracket. Create them all now.
-        if ($slot_count == 0 && $max_teams > 0) {
-            $createSlotsStmt = $pdo->prepare(
-                "INSERT INTO bracket_positions (category_id, position, seed, team_id) VALUES (?, ?, ?, NULL)"
-            );
-            for ($i = 1; $i <= $max_teams; $i++) {
-                // Position and Seed are set, but team_id is left NULL
-                $createSlotsStmt->execute([$category_id, $i, $i]);
+        $is_invalid = false;
+        if (count($existing_clusters) !== $num_groups) {
+            $is_invalid = true; // Wrong number of groups.
+        } elseif (count($existing_clusters) > 1 && count(array_unique($existing_clusters)) === 1) {
+            $is_invalid = true; // More than one group, but all have the same name (e.g., all are '0').
+        }
+
+        // 2. If clusters are invalid or don't exist, wipe and recreate them correctly.
+        if ($is_invalid || empty($existing_clusters)) {
+            // Delete any potentially broken cluster entries for this category.
+            $deleteClustersStmt = $pdo->prepare("DELETE FROM cluster WHERE category_id = ?");
+            $deleteClustersStmt->execute([$category_id]);
+
+            // Recreate them with 1-based indexing (1 for Group A, 2 for Group B, etc.) to match original logic.
+            $createClusterStmt = $pdo->prepare("INSERT INTO cluster (category_id, cluster_name) VALUES (?, ?)");
+            for ($i = 1; $i <= $num_groups; $i++) {
+                $createClusterStmt->execute([$category_id, $i]);
             }
         }
-        // === END: NEW LOGIC ===
-
-        // Now, find the first available (NULL) slot and update it.
-        $findSlotStmt = $pdo->prepare(
-            "SELECT position FROM bracket_positions 
-             WHERE category_id = ? AND team_id IS NULL 
-             ORDER BY position ASC LIMIT 1"
-        );
-        $findSlotStmt->execute([$category_id]);
-        $available_slot = $findSlotStmt->fetchColumn();
-
-        if ($available_slot) {
-            $updateBpStmt = $pdo->prepare(
-                "UPDATE bracket_positions SET team_id = ? WHERE category_id = ? AND position = ?"
-            );
-            $updateBpStmt->execute([$team_id, $category_id, $available_slot]);
-        } else {
-            // This error should now be impossible to reach.
-            throw new Exception("Could not find an empty bracket slot despite passing the count check.");
-        }
-    }
-    
-    if ($is_round_robin && $num_groups > 0) {
+        
+        // 3. With guaranteed correct clusters, proceed with the original assignment logic.
         $clusterStmt = $pdo->prepare("SELECT id FROM cluster WHERE category_id = ? ORDER BY cluster_name ASC");
         $clusterStmt->execute([$category_id]);
         $cluster_ids = $clusterStmt->fetchAll(PDO::FETCH_COLUMN);
 
         if (!empty($cluster_ids)) {
             $target_cluster_index = $current_count % $num_groups;
-            $target_cluster_id = $cluster_ids[$target_cluster_index];
-            $updateTeamStmt = $pdo->prepare("UPDATE team SET cluster_id = ? WHERE id = ?");
-            $updateTeamStmt->execute([$target_cluster_id, $team_id]);
+            if (isset($cluster_ids[$target_cluster_index])) {
+                $target_cluster_id = $cluster_ids[$target_cluster_index];
+                $updateTeamStmt = $pdo->prepare("UPDATE team SET cluster_id = ? WHERE id = ?");
+                $updateTeamStmt->execute([$target_cluster_id, $team_id]);
+            } else {
+                 throw new Exception("Calculated cluster index is out of bounds.");
+            }
+        }
+    }
+    
+    // Logic for bracket formats (remains unchanged)
+    if ($is_bracket_format) {
+        $slotCheckStmt = $pdo->prepare("SELECT COUNT(*) FROM bracket_positions WHERE category_id = ?");
+        $slotCheckStmt->execute([$category_id]);
+        if ($slotCheckStmt->fetchColumn() == 0 && $max_teams > 0) {
+            $createSlotsStmt = $pdo->prepare("INSERT INTO bracket_positions (category_id, position, seed, team_id) VALUES (?, ?, ?, NULL)");
+            for ($i = 1; $i <= $max_teams; $i++) {
+                $createSlotsStmt->execute([$category_id, $i, $i]);
+            }
+        }
+
+        $findSlotStmt = $pdo->prepare("SELECT position FROM bracket_positions WHERE category_id = ? AND team_id IS NULL ORDER BY position ASC LIMIT 1");
+        $findSlotStmt->execute([$category_id]);
+        $available_slot = $findSlotStmt->fetchColumn();
+
+        if ($available_slot) {
+            $updateBpStmt = $pdo->prepare("UPDATE bracket_positions SET team_id = ? WHERE category_id = ? AND position = ?");
+            $updateBpStmt->execute([$team_id, $category_id, $available_slot]);
+        } else {
+            throw new Exception("Could not find an empty bracket slot despite passing the count check.");
         }
     }
 
@@ -129,3 +139,4 @@ try {
 
 header("Location: category_details.php?category_id=" . $category_id . "&tab=teams");
 exit;
+?>

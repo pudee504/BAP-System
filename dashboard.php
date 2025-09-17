@@ -10,19 +10,14 @@ if (!isset($_SESSION['user_id'])) {
 include 'db.php';
 
 $user_id = $_SESSION['user_id'];
-// --- CHANGED: We now get the role NAME from the session, not the ID ---
 $user_role = $_SESSION['role_name']; 
 $params = [];
 $leagues = [];
-$query = ''; // Initialize the query variable to prevent errors
+$query = ''; 
 
-// --- CHANGED: The logic now checks for the role NAME ('Admin') ---
 if ($user_role === 'Admin') {
-    // --- User is an ADMIN ---
     $query = "SELECT * FROM league ORDER BY id ASC";
-
-} else { // Covers any other role, like 'League Manager' or 'League Staff'
-    // --- User is LEAGUE STAFF or another non-admin role ---
+} else {
     $query = "SELECT l.*, GROUP_CONCAT(lma.assignment_id) AS assignments
               FROM league l
               JOIN league_manager_assignment lma ON l.id = lma.league_id
@@ -32,13 +27,11 @@ if ($user_role === 'Admin') {
     $params['user_id'] = $user_id;
 }
 
-// This section will now work because $query is always set
 if (!empty($query)) {
     $stmt = $pdo->prepare($query);
     $stmt->execute($params);
     $leagues = $stmt->fetchAll(PDO::FETCH_ASSOC);
 }
-
 ?>
 
 <!DOCTYPE html>
@@ -46,55 +39,25 @@ if (!empty($query)) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - League Management</title>
+    <title>Dashboard - BAP Federation Makilala Chapter</title>
     <link rel="stylesheet" href="style.css">
-    
-    <style>
-        .search-container {
-            position: relative;
-            width: 100%;
-            max-width: 800px;
-            margin-bottom: 20px;
-        }
-        #leagueSearchInput {
-            width: 100%;
-            padding: 10px 15px 10px 40px; /* Left padding for icon */
-            border: 1px solid #ccc;
-            border-radius: 25px;
-            font-size: 16px;
-            box-sizing: border-box;
-            transition: box-shadow 0.2s;
-        }
-        #leagueSearchInput:focus {
-            outline: none;
-            border-color: #007bff;
-            box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
-        }
-        .search-container::before {
-            /* Search icon */
-            content: '🔍';
-            position: absolute;
-            left: 15px;
-            top: 50%;
-            transform: translateY(-50%);
-            pointer-events: none;
-            color: #888;
-        }
-    </style>
 </head>
 <body>
-<?php include 'includes/header.php'; // Corrected path if it's not in an includes folder ?>
+<?php include 'includes/header.php'; ?>
 
 <div class="dashboard-container">
-    <h1 style="margin-bottom: 20px">Leagues</h1>
-
-    <div class="search-container">
-        <input type="text" id="leagueSearchInput" placeholder="Search leagues...">
+    
+    <div class="dashboard-header">
+        <h1>Leagues</h1>
+        <div class="search-container">
+            <input type="text" id="leagueSearchInput" placeholder="Search leagues by name...">
+        </div>
     </div>
     
-    <!-- --- CHANGED: Check against the role name variable --- -->
     <?php if ($user_role === 'Admin'): ?>
-        <a href="create_league.php" class="create-league-button">+ Create League</a>
+        <div style="margin-bottom: 1.5rem;">
+            <a href="create_league.php" class="btn btn-primary create-league-button">+ Create New League</a>
+        </div>
     <?php endif; ?>
     
     <div class="table-wrapper">
@@ -118,15 +81,14 @@ if (!empty($query)) {
                             </td>
                             <td><?= htmlspecialchars($league['location']) ?></td>
                             <td><?= htmlspecialchars($league['status']) ?></td>
-                            <td>
+                            <td class="actions">
                                 <?php
-                                // --- CHANGED: Check against the role name variable ---
                                 $hasManagerPermission = ($user_role === 'Admin') || (isset($league['assignments']) && in_array('1', explode(',', $league['assignments'])));
                                 ?>
 
                                 <?php if ($hasManagerPermission): ?>
-                                    <a href="edit_league.php?id=<?= $league['id'] ?>">Edit</a> |
-                                    <a href="delete_league.php?id=<?= $league['id'] ?>" onclick="return confirm('Are you sure you want to delete this league?');">Delete</a>
+                                    <a href="edit_league.php?id=<?= $league['id'] ?>">Edit</a>
+                                    <a href="delete_league.php?id=<?= $league['id'] ?>" class="action-delete" onclick="return confirm('Are you sure you want to delete this league?');">Delete</a>
                                 <?php else: ?>
                                     <a href="league_details.php?id=<?= $league['id'] ?>">View</a>
                                 <?php endif; ?>
@@ -140,11 +102,10 @@ if (!empty($query)) {
                     <tr class="no-results">
                         <td colspan="4">
                             <div class="no-results-message">
-                                <!-- --- CHANGED: Check against the role name variable --- -->
                                 <?php if ($user_role !== 'Admin'): ?>
-                                    You have not been assigned to any leagues.
+                                    You have not been assigned to any leagues yet.
                                 <?php else: ?>
-                                    No leagues found.
+                                    No leagues have been created yet.
                                 <?php endif; ?>
                             </div>
                         </td>
@@ -156,12 +117,12 @@ if (!empty($query)) {
 </div>
 
 <script>
-// Your JavaScript for live search remains unchanged as it is correct.
 document.addEventListener('DOMContentLoaded', function() {
     const searchInput = document.getElementById('leagueSearchInput');
     const tableBody = document.getElementById('leaguesTableBody');
-    const allRows = tableBody.querySelectorAll('tr:not(#no-results-row)');
+    const allRows = Array.from(tableBody.querySelectorAll('tr')).filter(row => row.id !== 'no-results-row' && !row.classList.contains('no-results'));
     const noResultsRow = document.getElementById('no-results-row');
+    const originalNoResults = document.querySelector('.no-results');
 
     searchInput.addEventListener('keyup', function() {
         const searchTerm = searchInput.value.toLowerCase();
@@ -178,7 +139,17 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
 
-        noResultsRow.style.display = (visibleRows === 0) ? '' : 'none';
+        if (originalNoResults) {
+            originalNoResults.style.display = 'none';
+        }
+
+        if (noResultsRow && allRows.length > 0) {
+           noResultsRow.style.display = (visibleRows === 0) ? '' : 'none';
+        }
+
+        if (searchTerm === '' && originalNoResults) {
+            originalNoResults.style.display = '';
+        }
     });
 });
 </script>

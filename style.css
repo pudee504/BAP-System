@@ -1,352 +1,690 @@
-/* General Reset */
+/* ==========================================================================
+   1. THEME VARIABLES & GENERAL RESET
+   ========================================================================== */
+:root {
+    --bap-blue: #1f2593;
+    --bap-orange: #fc9e3e;
+    --bap-yellow: #FFC107; /* A gold/yellow color from the 'BAP' text */
+    --bap-red: #D81B60; /* A red from the logo for dangerous actions */
+    --text-dark: #212529;
+    --text-light: #f8f9fa;
+    --bg-light: #ffffff;
+    --bg-main: #f4f7fc; /* A very light grey for the main background */
+    --border-color: #dee2e6;
+    --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
-  }
-  
-  body {
-    font-family: Arial, sans-serif;
-    background: linear-gradient(to bottom right, #1f2593, #fc9e3e);
-    min-height: 100vh;
-    color: #fff;
-    margin: 0;
-    
-  }
-
-  body.login-page {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  margin: 0;
-  background: linear-gradient(to bottom right, #1f2593, #fc9e3e);
 }
 
-body.login-page .login-container {
-  background-color: rgba(0, 0, 0, 0.8);
-  padding: 2rem;
-  border-radius: 12px;
-  width: 100%;
-  max-width: 400px;
-  box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--bg-main);
+    color: var(--text-dark);
+    line-height: 1.6;
 }
 
-
-  
-  /* Container */
-  .login-container {
-    background-color: rgba(0, 0, 0, 0.8);
-    padding: 2rem;
-    border-radius: 12px;
-    width: 100%;
-    max-width: 400px;
-    box-shadow: 0 8px 16px rgba(0,0,0,0.3);
-  }
-  
-  /* Heading */
-  .login-container h1 {
-    text-align: center;
-    margin-bottom: 1.5rem;
-    color: #ff6b00;
-  }
-  
-  /* Error Message */
-  .error {
-    background-color: #ff4d4d;
-    padding: 0.75rem;
-    margin-bottom: 1rem;
-    border-radius: 8px;
-    text-align: center;
-  }
-  
-  /* Form Elements */
-  .form-group {
-    margin-bottom: 1.25rem;
-  }
-  
-  label {
-    display: block;
-    margin-bottom: 0.5rem;
-    font-weight: bold;
-  }
-  
-  input[type="text"],
-  input[type="password"] {
-    width: 100%;
-    padding: 0.75rem;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-  }
-  
-  input[type="text"]:focus,
-  input[type="password"]:focus {
-    outline: 2px solid #ff6b00;
-  }
-  
-  /* Button */
-  .login-button {
-    width: 100%;
-    padding: 0.75rem;
-    background-color: #ff6b00;
-    border: none;
-    border-radius: 8px;
-    font-size: 1rem;
-    font-weight: bold;
-    color: white;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-  }
-  
-  .login-button:hover {
-    background-color: #e65c00;
-  }
-
-  .toggle-label {
-    font-size: 0.9rem;
-    margin-left: 0.4rem;
-    cursor: pointer;
-    user-select: none;
-  }
-  
-  #togglePassword {
-    transform: scale(1.1);
-    vertical-align: middle;
-  }
-  
- .dashboard-container {
-    max-width: 1200px;
-    margin: 2rem auto;
-    background: white;
-    color: black;
-    padding: 2rem;
-    border-radius: 12px;
-}
-
-.search-form {
-    margin-bottom: 3rem;
-    display: flex;
-    gap: 1rem;
-}
-
-.search-form input[type="text"] {
-    flex-grow: 1;
-    padding: 0.5rem;
-    outline: 2px solid #ff6b00; 
-    border: none;               
-    border-radius: 8px;
-}
-
-.create-league-button {
-    display: inline-block;
-    margin-bottom: 1rem;
-    padding: 0.5rem 1rem;
-    background-color: #004aad;
-    color: white;
-    text-decoration: none;
-    border-radius: 8px;
-}
-
-.date-range {
-  display: flex;
-  gap: 1rem;
-  justify-content: space-between;
-}
-
-.date-range .form-group.half {
-  flex: 1;
-}
-
-.table-wrapper {
-  min-height: 200px;
-}
-
-.leagues-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.leagues-table th,
-.leagues-table td {
-  padding: 0.75rem;
-  border: 1px solid #ccc;
-  text-align: left;
-}
-
-.no-results td {
-  height: 50px; /* Enough height for visual spacing */
-  padding: 0;
-}
-
-.no-results-message {
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  font-style: italic;
-  color: #888;
-}
-
-.leagues-table a {
-  color: #3498db;
-  text-decoration: none;
-  font-weight: bold;
-}
-
-.leagues-table a:hover {
-  text-decoration: underline;
-}
-
-
-.error-message {
-      color: red;
-      background-color: #ffe5e5;
-      border: 1px solid #ffb3b3;
-      padding: 10px;
-      margin-bottom: 15px;
-      text-align: center;
-      border-radius: 5px;
-      width: 100%;
-    }
-
+/* ==========================================================================
+   2. TOPBAR / HEADER
+   ========================================================================== */
 .topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: #1f2593; /* BAP blue */
-  color: white;
-  padding: 10px 20px;
-  position: sticky;
-  top: 0;
-  z-index: 1000;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--bap-blue);
+    color: var(--text-light);
+    padding: 0.75rem 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
 
 .left-section {
-  display: flex;
-  align-items: center;
-  gap: 20px; /* space between logo and Home */
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
 }
 
-/* LOGO LEFT */
 .logo-img {
-  margin-left: auto;
-  height: 60px;
-  border-radius: 8px;         /* rounded corners */
-  border: 0.5px solid white;    /* white outline */
-  background-color: white;    /* optional: fill behind transparent logos */
-  padding: 2px;               /* optional: space inside the border */
+    height: 50px;
+    border-radius: 6px;
 }
 
-/* USER ICON RIGHT */
-.user-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  object-fit: cover;
-  cursor: pointer;
-}
-
-/* --- NAVIGATION BAR --- */
 .nav-bar {
-  background-color: transparent; /* Remove background so it matches topbar */
-  padding: 0;                    /* Remove padding to align nicely */
+    background-color: transparent;
 }
 
 .nav-link {
-  color: white;
-  text-decoration: none;
-  font-size: 20px;
-  font-weight: bold;
+    color: var(--text-light);
+    text-decoration: none;
+    font-size: 1.1rem;
+    font-weight: 500;
+    padding: 0.5rem 0;
+    position: relative;
+    transition: color 0.3s ease;
+}
+
+.nav-link::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: 0;
+    left: 0;
+    background-color: var(--bap-yellow);
+    transition: width 0.3s ease;
 }
 
 .nav-link:hover {
-  text-decoration: underline;
+    color: var(--bap-yellow);
 }
 
-.league-info p {
-  margin: 0.5rem 0;
-  font-size: 1rem;
-}
-
-.category-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-top: 20px;
-}
-
-.category-table th,
-.category-table td {
-  border: 1px solid #ccc;
-  padding: 8px;
-  text-align: left;
-}
-
-select,
-  input[type="number"],
-  input[type="text"] {
+.nav-link:hover::after {
     width: 100%;
-    padding: 10px;
-    margin: 8px 0 16px;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    font-size: 16px;
-    background-color: #f9f9f9;
-    box-sizing: border-box;
-    transition: border-color 0.3s;
-  }
-
-  select:focus,
-  input:focus {
-    border-color: #007BFF;
-    outline: none;
-    background-color: #fff;
-  }
-
-  .match-cell {
-  padding: 0.5rem;
-  line-height: 1.6;
 }
 
-.team-line {
-  display: block;
-  padding: 4px 0;
+.user-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    cursor: pointer;
+    border: 2px solid var(--bap-yellow);
+}
+
+/* ==========================================================================
+   3. DASHBOARD & GENERAL CONTAINERS
+   ========================================================================== */
+.dashboard-container, .form-container {
+    max-width: 1200px;
+    margin: 2rem auto;
+    background: var(--bg-light);
+    padding: 2.5rem;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+}
+
+/* Header for the main dashboard with the search bar */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+/* Header for sub-pages like League Details */
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 1.5rem;
+}
+
+.dashboard-container h1, .form-container h1, .page-header h1 {
+    font-size: 2.5rem;
+    color: var(--bap-blue);
+    font-weight: 700;
+    margin: 0;
+}
+
+/* Page titles can also be links */
+.page-header h1 a {
+    color: var(--bap-blue);
+    text-decoration: none;
+    transition: color 0.3s ease;
+}
+.page-header h1 a:hover {
+    color: var(--bap-orange);
+}
+
+
+.league-info {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem 2.5rem; /* Row and column gap */
+    margin-bottom: 2rem;
+    font-size: 1rem;
+    color: #495057;
+    background-color: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.league-info p { margin: 0; }
+.league-info strong { color: var(--text-dark); }
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 2.5rem;
+    margin-bottom: 1.5rem;
+}
+.section-header:first-child {
+    margin-top: 0;
+}
+
+.section-header h2 {
+    font-size: 1.75rem;
+    color: var(--text-dark);
+}
+
+.form-container h1 {
+     text-align: center;
+     margin-bottom: 2rem;
+}
+
+/* ==========================================================================
+   4. FORMS & INPUTS
+   ========================================================================== */
+.form-container {
+    max-width: 800px; /* Forms can be narrower */
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+    color: #495057;
+}
+
+input[type="text"],
+input[type="date"],
+input[type="datetime-local"],
+input[type="password"],
+input[type="number"],
+select {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: #fdfdff;
+    color: var(--text-dark);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+input[type="text"]:focus,
+input[type="date"]:focus,
+input[type="datetime-local"]:focus,
+input[type="password"]:focus,
+input[type="number"]:focus,
+select:focus {
+    outline: none;
+    border-color: var(--bap-blue);
+    background-color: var(--bg-light);
+    box-shadow: 0 0 0 3px rgba(31, 37, 147, 0.2);
+}
+
+.date-range {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.5rem;
+    justify-content: space-between;
+}
+
+.date-range .form-group {
+    flex: 1;
+    min-width: 200px;
+}
+
+.search-container {
+    position: relative;
+    width: 100%;
+    max-width: 400px;
+}
+
+#leagueSearchInput {
+    padding: 0.75rem 1rem 0.75rem 2.5rem;
+    border-radius: 50px;
+}
+
+.search-container::before {
+    content: '🔍';
+    position: absolute;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: #aaa;
+}
+
+.add-team-form {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+    align-items: center;
+}
+.add-team-form input[type="text"] {
+    flex-grow: 1;
+}
+.add-team-form button {
+    flex-shrink: 0;
+}
+
+/* Password toggle styling */
+.password-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #ccc;
+}
+.password-toggle input {
+    width: auto;
+    margin-right: 0.5rem;
+}
+.password-toggle label {
+    color: #6c757d; /* Changed from light color */
+    cursor: pointer;
+}
+
+
+/* ==========================================================================
+   5. BUTTONS & ACTIONS
+   ========================================================================== */
+.btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 50px;
+    font-size: 1rem;
+    font-weight: bold;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: center;
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.btn-primary {
+    background: linear-gradient(45deg, var(--bap-orange), var(--bap-yellow));
+    color: var(--text-dark);
+}
+
+.btn-danger {
+    background: var(--bap-red);
+    color: var(--text-light);
+}
+.btn-danger:hover {
+    background: #a71045;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: var(--text-light);
+}
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
+
+.btn-sm { /* Small button for actions in tables */
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+}
+
+
+button:disabled, .btn:disabled {
+    background-color: #e9ecef;
+    background-image: none;
+    color: #6c757d;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.form-actions {
+    margin-top: 2rem;
+    text-align: center;
+}
+
+.back-link {
+    display: block;
+    margin-top: 1.5rem;
+    text-align: center;
+    color: #6c757d;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+.back-link:hover {
+    text-decoration: underline;
+}
+
+/* THIS IS THE FIX: Ensures any link styled as a button does not change text color on hover */
+a.btn-primary:hover,
+a.btn-secondary:hover,
+a.btn-danger:hover {
+    text-decoration: none;
+}
+a.btn-primary:hover { color: var(--text-dark) !important; }
+a.btn-secondary:hover, a.btn-danger:hover { color: var(--text-light) !important; }
+
+
+/* UNIFIED DELETE STYLES */
+.action-delete, .action-link-button {
+    background: transparent;
+    border: none;
+    padding: 0;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 500;
+    color: var(--bap-red) !important;
+    text-decoration: none;
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+.action-delete:hover, .action-link-button:hover {
+    background: transparent; 
+    color: #a71045 !important;
+    text-decoration: underline;
+}
+
+
+/* ==========================================================================
+   6. TABLES & SCHEDULE
+   ========================================================================== */
+.table-wrapper {
+    overflow-x: auto;
+}
+
+.leagues-table, .category-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.95rem;
+}
+
+.leagues-table thead, .category-table thead {
+    background-color: #e9ecef;
+}
+
+.leagues-table th, .category-table th {
+    padding: 1rem;
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 2px solid var(--border-color);
+}
+
+.leagues-table td, .category-table td {
+    padding: 1rem;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: middle;
+}
+
+.leagues-table tbody tr:last-child td, .category-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.leagues-table tbody tr:hover, .category-table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.leagues-table a, .category-table a {
+    color: var(--bap-blue);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.2s;
+}
+
+.leagues-table a:hover, .category-table a:hover {
+    color: var(--bap-orange);
+    text-decoration: underline;
+}
+
+.actions a { margin-right: 0.75rem; }
+.actions a:last-child { margin-right: 0; }
+/* The .action-delete class is now globally defined */
+
+#no-results-row td, .no-results td {
+    text-align: center;
+    padding: 2rem;
+    color: #6c757d;
+    font-style: italic;
+}
+
+.schedule-actions {
+    padding: 1.5rem;
+    background-color: #f8f9fa;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 2rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+.schedule-actions p {
+    font-size: 0.9em;
+    margin-top: 0.5rem;
+    max-width: 500px;
+}
+.schedule-actions .btn {
+    margin-bottom: 0.5rem;
 }
 
 .match-grid {
-  display: grid;
-  grid-template-columns: 1fr 40px;
-  row-gap: 4px;
-  column-gap: 8px;
-  align-items: center;
-  border: 1px solid #ccc;
-  padding: 6px;
-  border-radius: 6px;
-  background-color: #fff;
-  color: #000;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 0.5rem;
+    align-items: center;
 }
-
-.team-name a {
-  text-decoration: none;
-  color: #000;
-  font-weight: bold;
-}
-
+.team-name { padding: 0.25rem 0.5rem; }
 .team-result {
-  text-align: center;
-  font-weight: bold;
-  border-left: 1px solid #ccc;
+    font-weight: bold;
+    text-align: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    color: var(--text-dark);
+}
+.team-result.win {
+    background-color: #d4edda;
+    color: #155724;
+}
+.team-result.loss {
+    background-color: #f8d7da;
+    color: #721c24;
 }
 
-.schedule-button {
-  padding: 10px 15px;
-  background-color: #ff6b00;
-  color: white;
-  border: none;
-  cursor: pointer;
-  border-radius: 8px;
-  font-weight: bold;
+.set-date-form {
+    display: none;
+    margin-top: 1rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+.set-date-form input[type="datetime-local"] {
+    margin-bottom: 0.5rem;
 }
 
+
+/* ==========================================================================
+   7. TABS & NAVIGATION
+   ========================================================================== */
+.tab-navigation {
+    display: flex;
+    border-bottom: 2px solid var(--border-color);
+    margin-bottom: 2rem;
+}
+.tab { 
+    padding: 0.75rem 1.5rem;
+    cursor: pointer;
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #6c757d;
+    text-decoration: none;
+    border-bottom: 3px solid transparent;
+    transition: color 0.3s ease, border-color 0.3s ease;
+}
+.tab:hover {
+    color: var(--bap-blue);
+}
+.tab.active {
+    color: var(--bap-blue);
+    border-bottom-color: var(--bap-blue);
+}
+.tab-content {
+    display: none; /* Hidden by default */
+}
+.tab-content.active {
+    display: block; /* Shown when active */
+}
+
+/* ==========================================================================
+   8. TEAM MANAGEMENT LAYOUT
+   ========================================================================== */
+.team-management-grid {
+    display: grid;
+    grid-template-columns: 1fr 2fr; /* 1/3 for forms, 2/3 for roster */
+    gap: 2.5rem;
+    align-items: start;
+}
+
+/* Responsive adjustment for smaller screens */
+@media (max-width: 900px) {
+    .team-management-grid {
+        grid-template-columns: 1fr; /* Stack columns on smaller screens */
+    }
+}
+
+.management-forms .form-container {
+    padding: 0;
+    margin: 0;
+    box-shadow: none;
+}
+
+.roster-container h2 {
+    margin-bottom: 1.5rem;
+}
+
+/* ==========================================================================
+   9. MESSAGES & NOTIFICATIONS
+   ========================================================================== */
+.form-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.info-message {
+    text-align: center;
+    padding: 2rem;
+    color: #6c757d;
+    font-style: italic;
+}
+
+.success-message {
+    background-color: #d4edda;
+    color: #155724;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #c3e6cb;
+    border-radius: 8px;
+}
+
+.warning-message {
+    background-color: #fff3cd;
+    color: #856404;
+    padding: 1rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid #ffeeba;
+    border-radius: 8px;
+}
+
+
+.error {
+    background-color: var(--bap-red);
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    text-align: center;
+    color: var(--text-light);
+}
+
+/* ==========================================================================
+   10. LOGIN PAGE
+   ========================================================================== */
+body.login-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    /* --- NEW BACKGROUND --- */
+    background-color: var(--bg-main);
+    background-image:
+        linear-gradient(135deg, rgba(31, 37, 147, 0.05) 25%, transparent 25%),
+        linear-gradient(225deg, rgba(31, 37, 147, 0.05) 25%, transparent 25%),
+        linear-gradient(45deg, rgba(31, 37, 147, 0.05) 25%, transparent 25%),
+        linear-gradient(315deg, rgba(31, 37, 147, 0.05) 25%, var(--bg-main) 25%);
+    background-size: 50px 50px; /* Made the pattern slightly larger */
+    background-position: 0 0, 25px 25px, 25px 25px, 0 0;
+}
+
+.login-container {
+    background-color: var(--bg-light); 
+    padding: 2.5rem;
+    border-radius: 12px;
+    width: 100%;
+    max-width: 450px; 
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12); /* Slightly stronger shadow */
+    color: var(--text-dark); 
+}
+
+.login-container .login-logo {
+    display: block;
+    margin: 0 auto 1.5rem auto;
+    height: 80px;
+    border-radius: 8px;
+}
+
+.login-container h1 {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    color: var(--bap-blue); 
+    font-size: 2rem;
+}
+
+.login-button {
+    width: 100%;
+    padding: 0.75rem;
+    background: linear-gradient(45deg, var(--bap-orange), var(--bap-yellow)); 
+    border: none;
+    border-radius: 50px; 
+    font-size: 1.1rem; 
+    font-weight: bold;
+    color: var(--text-dark); 
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.login-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
 

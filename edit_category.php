@@ -30,12 +30,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $update->execute([$category_name, $category_id]);
 
             // --- DETAILED SUCCESS LOGGING ---
-            // Compare the original name with the new one
             if ($category['category_name'] !== $category_name) {
                 $log_details = "Updated category in league ID {$league_id}: changed name from '{$category['category_name']}' to '{$category_name}' (Category ID: {$category_id}).";
                 log_action('UPDATE_CATEGORY', 'SUCCESS', $log_details);
             } else {
-                // Log if the user clicked "Update" but made no changes
                 $log_details = "Submitted update for category '{$category['category_name']}' (ID: {$category_id}) with no changes.";
                 log_action('UPDATE_CATEGORY', 'INFO', $log_details);
             }
@@ -57,25 +55,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edit Category</title>
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="login-page">
-<div class="login-container">
+<body>
+<?php include 'includes/header.php'; ?>
+<div class="form-container">
     <h1>Edit Category</h1>
 
     <?php if (!empty($error)): ?>
-        <p style="color:red"><?= htmlspecialchars($error) ?></p>
+        <div class="form-error"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
 
-    <form method="POST">
-        <label>Category Name:</label><br>
-        <input type="text" name="category_name" value="<?= htmlspecialchars($category['category_name']) ?>" required><br><br>
-        <button class="login-button" type="submit">Update Category</button>
+    <form method="POST" action="edit_category.php?id=<?= $category_id ?>&league_id=<?= $league_id ?>">
+        <div class="form-group">
+            <label for="category_name">Category Name</label>
+            <input type="text" id="category_name" name="category_name" value="<?= htmlspecialchars($category['category_name']) ?>" required>
+        </div>
+        
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Update Category</button>
+        </div>
     </form>
 </div>
 </body>

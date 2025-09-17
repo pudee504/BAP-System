@@ -7,7 +7,7 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['role_name']) || $_SESSION[
 }
 
 $pdo = require 'db.php';
-require_once 'logger.php'; // --- ADDED: Include the logger file ---
+require_once 'logger.php'; 
 
 $error = '';
 $success = '';
@@ -40,7 +40,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
             $stmt->execute([$username]);
             if ($stmt->fetch()) {
                 $error = 'Username already exists.';
-                // --- ADDED: Log failed attempt (username exists) ---
                 $log_details = "Attempted to create user '{$username}' but it already exists.";
                 log_action('USER_CREATE_ATTEMPT', 'FAILURE', $log_details);
             } else {
@@ -57,12 +56,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['create_user'])) {
                         }
                     }
                     $success = 'User created successfully!';
-                    // --- ADDED: Log successful creation ---
                     $log_details = "Successfully created new user '{$username}' (ID: {$user_id}).";
                     log_action('USER_CREATE', 'SUCCESS', $log_details);
                 } else {
                     $error = 'Failed to create user.';
-                    // --- ADDED: Log failed attempt (database error) ---
                     $log_details = "Database error while trying to create user '{$username}'.";
                     log_action('USER_CREATE', 'FAILURE', $log_details);
                 }
@@ -100,107 +97,147 @@ $leagues = $pdo->query("SELECT id, league_name FROM league ORDER BY league_name"
     <link rel="stylesheet" href="style.css"> 
     
     <style>
-        /* All your existing styles for this page remain the same */
-        .users-container { max-width: 960px; margin: 2rem auto; background: white; color: #333; padding: 2rem; border-radius: 12px; }
-        .users-container h1, .users-container h2 { color: #1f2593; margin-bottom: 1.5rem; }
-        .form-section, .list-section { background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #eee; }
-        table { width: 100%; border-collapse: collapse; color: #333; }
-        th, td { padding: 10px; border: 1px solid #ddd; text-align: left; vertical-align: top; }
-        th { background-color: #f2f2f2; }
-        .actions a { margin-right: 10px; color: #007bff; text-decoration: none; }
-        .actions a:hover { text-decoration: underline; }
-        .actions .delete { color: #dc3545; }
-        .message { padding: 10px; margin-bottom: 15px; border-radius: 5px; color: #333; }
-        .error { background-color: #f8d7da; color: #721c24; }
-        .success { background-color: #d4edda; color: #155724; }
-        .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; color: #333; font-weight: bold; }
-        .users-container input[type="text"], .users-container input[type="password"], .users-container select { color: #333; background-color: #fff; border: 1px solid #ccc; width: 100%; padding: 8px; box-sizing: border-box; }
-        button { padding: 10px 15px; background-color: #ff6b00; color: white; border: none; cursor: pointer; border-radius: 8px; font-weight: bold; }
-        button:hover { background-color: #e65c00; }
-        .password-wrapper { position: relative; }
-        .password-toggle { margin-top: 10px; }
-        #password-validation-ui { list-style-type: none; padding: 0; margin-top: 10px; font-size: 0.9em; }
-        #password-validation-ui li { color: #dc3545; margin-bottom: 4px; }
-        #password-validation-ui li.valid { color: #28a745; }
-        #password-validation-ui li.valid::before { content: '✓ '; }
-        #password-validation-ui li::before { content: '✗ '; }
-        .league-checkbox-group { max-height: 150px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; background-color: #fff; border-radius: 4px; }
-        .league-checkbox-group label { display: block; font-weight: normal; margin-bottom: 5px; }
-        .league-list { list-style-type: none; padding: 0; margin: 0; }
-        .league-list li { background-color: #e9ecef; padding: 4px 8px; border-radius: 4px; margin-bottom: 4px; font-size: 0.9em; }
-        .all-leagues-badge { background-color: #17a2b8; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.9em; font-weight: bold; }
+        /* Page-specific styles for custom components */
+        #password-validation-ui {
+            list-style-type: none;
+            padding: 0;
+            margin-top: 0.75rem;
+            font-size: 0.9em;
+        }
+        #password-validation-ui li {
+            color: var(--bap-red);
+            margin-bottom: 0.25rem;
+            transition: color 0.3s ease;
+        }
+        #password-validation-ui li.valid {
+            color: #155724; /* A good, accessible green */
+        }
+        #password-validation-ui li.valid::before {
+            content: '✓ ';
+            font-weight: bold;
+        }
+        #password-validation-ui li::before {
+            content: '✗ ';
+            font-weight: bold;
+        }
+        .league-checkbox-group {
+            max-height: 150px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            padding: 1rem;
+            background-color: #fdfdff;
+            border-radius: 8px;
+        }
+        .league-checkbox-group label {
+            display: block;
+            font-weight: normal;
+            margin-bottom: 0.5rem;
+            cursor: pointer;
+        }
+        .league-checkbox-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 0.5rem;
+            vertical-align: middle;
+        }
+        .league-list {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.25rem;
+        }
+        .league-list li {
+            background-color: #e9ecef;
+            color: var(--text-dark);
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.85em;
+        }
+        .all-leagues-badge {
+            display: inline-block;
+            background-color: var(--bap-blue);
+            color: var(--text-light);
+            padding: 0.25rem 0.75rem;
+            border-radius: 50px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
     <?php include 'includes/header.php'; ?>
 
     <main>
-        <div class="users-container">
-            <h1>User Management</h1>
+        <div class="dashboard-container">
+            <div class="page-header">
+                <h1>User Management</h1>
+            </div>
 
-            <?php if ($error): ?><div class="message error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
-            <?php if ($success): ?><div class="message success"><?= htmlspecialchars($success) ?></div><?php endif; ?>
+            <?php if ($error): ?><div class="form-error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+            <?php if ($success): ?><div class="success-message"><?= htmlspecialchars($success) ?></div><?php endif; ?>
 
-            <section class="form-section">
+            <div class="section-header">
                 <h2>Create New User</h2>
-                <form action="users.php" method="POST">
-                    <div class="form-group">
-                        <label for="username">Username:</label>
-                        <input type="text" id="username" name="username" required>
+            </div>
+            <form action="users.php" method="POST">
+                <div class="form-group">
+                    <label for="username">Username:</label>
+                    <input type="text" id="username" name="username" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password:</label>
+                    <input type="password" id="password" name="password" required pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_]).{8,}" title="Password must contain at least one number, one uppercase, one lowercase, one special character, and be at least 8 characters long.">
+                    
+                    <div class="password-toggle">
+                        <input type="checkbox" id="togglePassword">
+                        <label for="togglePassword">Show Password</label>
                     </div>
                     
-                    <div class="form-group">
-                        <label for="password">Password:</label>
-                        <input type="password" id="password" name="password" required pattern="(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*[\W_]).{8,}" title="Password must contain at least one number, one uppercase, one lowercase, one special character, and be at least 8 characters long.">
-                        
-                        <div class="password-toggle">
-                            <input type="checkbox" id="togglePassword">
-                            <label for="togglePassword" style="font-weight:normal; display:inline;">Show Password</label>
-                        </div>
-                        
-                        <ul id="password-validation-ui">
-                            <li id="length">At least 8 characters</li>
-                            <li id="upper">At least one uppercase letter</li>
-                            <li id="lower">At least one lowercase letter</li>
-                            <li id="number">At least one number</li>
-                            <li id="special">At least one special character</li>
-                        </ul>
+                    <ul id="password-validation-ui">
+                        <li id="length">At least 8 characters</li>
+                        <li id="upper">At least one uppercase letter</li>
+                        <li id="lower">At least one lowercase letter</li>
+                        <li id="number">At least one number</li>
+                        <li id="special">At least one special character</li>
+                    </ul>
+                </div>
+                
+                <div class="form-group">
+                    <label for="role_id">Role:</label>
+                    <select id="role_id" name="role_id" required>
+                        <option value="">-- Select a Role --</option>
+                        <?php foreach ($roles as $role): ?>
+                            <option value="<?= $role['id'] ?>"><?= htmlspecialchars($role['role_name']) ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Assign Leagues (for League Managers):</label>
+                    <div class="league-checkbox-group">
+                    <?php if (empty($leagues)): ?>
+                        <p class="info-message" style="padding:0;">No leagues available.</p>
+                    <?php else: ?>
+                        <?php foreach ($leagues as $league): ?>
+                            <label>
+                                <input type="checkbox" name="leagues[]" value="<?= $league['id'] ?>">
+                                <?= htmlspecialchars($league['league_name']) ?>
+                            </label>
+                        <?php endforeach; ?>
+                    <?php endif; ?>
                     </div>
-                    
-                    <div class="form-group">
-                        <label for="role_id">Role:</label>
-                        <select id="role_id" name="role_id" required>
-                            <option value="">-- Select a Role --</option>
-                            <?php foreach ($roles as $role): ?>
-                                <option value="<?= $role['id'] ?>"><?= htmlspecialchars($role['role_name']) ?></option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Assign Leagues:</label>
-                        <div class="league-checkbox-group">
-                        <?php if (empty($leagues)): ?>
-                            <p>No leagues available.</p>
-                        <?php else: ?>
-                            <?php foreach ($leagues as $league): ?>
-                                <label>
-                                    <input type="checkbox" name="leagues[]" value="<?= $league['id'] ?>">
-                                    <?= htmlspecialchars($league['league_name']) ?>
-                                </label>
-                            <?php endforeach; ?>
-                        <?php endif; ?>
-                        </div>
-                    </div>
-                    
-                    <button type="submit" name="create_user">Create User</button>
-                </form>
-            </section>
+                </div>
+                
+                <button type="submit" name="create_user" class="btn btn-primary">Create User</button>
+            </form>
 
-            <section class="list-section">
+            <div class="section-header">
                 <h2>Existing Users</h2>
-                <table>
+            </div>
+            <div class="table-wrapper">
+                <table class="category-table">
                     <thead>
                         <tr><th>Username</th><th>Role</th><th>Assigned Leagues</th><th>Actions</th></tr>
                     </thead>
@@ -227,13 +264,13 @@ $leagues = $pdo->query("SELECT id, league_name FROM league ORDER BY league_name"
                             </td>
                             <td class="actions">
                                 <a href="edit_user.php?id=<?= $user['id'] ?>">Edit</a>
-                                <a href="delete_user.php?id=<?= $user['id'] ?>" class="delete" onclick="return confirm('Are you sure you want to delete this user?');">Delete</a>
+                                <a href="delete_user.php?id=<?= $user['id'] ?>" class="action-delete" onclick="return confirm('Are you sure you want to delete this user?');">Delete</a>
                             </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
-            </section>
+            </div>
         </div>
     </main>
 

@@ -34,7 +34,7 @@ if (!$scheduleGenerated):
     $num_teams = count($teams_by_position);
 
     if ($num_teams < 3) {
-        echo "<div class='bracket-notice error'>Double elimination requires at least 3 teams.</div>";
+        echo "<div class='warning-message'>Double elimination requires at least 3 teams.</div>";
         return;
     }
     
@@ -48,7 +48,7 @@ if (!$scheduleGenerated):
     $grand_final = $bracket_data['grand_final'];
     ?>
     
-    <p class="bracket-notice">Drag and drop any team to swap its initial position.</p>
+    <p class="info-message" style="text-align: left; padding: 0 0 1.5rem 0;">Drag and drop any team to swap its initial position.</p>
     <div class="tournament-wrapper">
         <div class="bracket-area">
             <div class="bracket-header">Winners Bracket</div>
@@ -259,24 +259,24 @@ else:
 endif;
 ?>
 
-<div style="margin-top: 20px;">
+<div class="bracket-controls">
     <?php if (!$bracketLocked): ?>
         <form action="lock_bracket_double_elim.php" method="POST" onsubmit="return confirm('Are you sure you want to lock this bracket? Matchups cannot be changed after locking.')">
             <input type="hidden" name="category_id" value="<?= $category_id ?>">
-            <button type="submit">Lock Bracket & Proceed to Schedule</button>
+            <button type="submit" class="btn btn-primary">Lock Bracket & Proceed to Schedule</button>
         </form>
     <?php else: ?>
         <?php if ($hasFinalGames): ?>
-            <button type="button" disabled>Unlock Bracket</button>
-            <p style="color: #6c757d; font-size: 0.9em; margin-top: 5px;">Cannot unlock bracket because games have been played.</p>
+            <button type="button" class="btn" disabled>Unlock Bracket</button>
+            <p>Cannot unlock bracket because games have been played.</p>
         <?php else: ?>
             <form action="unlock_bracket.php" method="POST" onsubmit="return confirm('Unlocking will allow you to change matchups. Are you sure?')">
                 <input type="hidden" name="category_id" value="<?= $category_id ?>">
-                <button type="submit" style="background-color: #ffc107; color: #212529;">Unlock Bracket</button>
+                <button type="submit" class="btn btn-primary">Unlock Bracket</button>
             </form>
         <?php endif; ?>
         <?php if (!$scheduleGenerated): ?>
-            <p class="bracket-notice success"><strong>Bracket is locked. You can now generate the schedule in the 'Schedule' tab.</strong></p>
+            <p class="success-message"><strong>Bracket is locked. You can now generate the schedule in the 'Schedule' tab.</strong></p>
         <?php endif; ?>
     <?php endif; ?>
 </div>
@@ -330,28 +330,162 @@ document.addEventListener('DOMContentLoaded', () => {
 <?php endif; ?>
 
 <style>
-.tournament-wrapper { width: 100%; font-family: sans-serif; }
-.bracket-notice { margin-bottom: 15px; }
-.bracket-notice.error { color: #dc3545; }
-.bracket-notice.success { color: #28a745; }
-.bracket-area { background-color: #2c2c2c; border-radius: 8px; margin-bottom: 25px; color: #fff; overflow-x: auto; }
-.bracket-header { background-color: #383838; padding: 10px 15px; font-size: 1.5em; font-weight: bold; border-bottom: 2px solid #444; border-top-left-radius: 8px; border-top-right-radius: 8px; }
-.bracket-body { display: flex; flex-direction: row; padding: 30px 20px; }
-.bracket-round { display: flex; flex-direction: column; justify-content: space-around; flex-shrink: 0; margin-right: 60px; min-width: 240px; }
-.bracket-round-title { text-align: center; color: #aaa; margin-bottom: 25px; font-weight: 600; }
-.bracket-match { display: flex; flex-direction: column; justify-content: center; position: relative; flex-grow: 1; padding-top: 25px; }
-.bracket-teams { background-color: #383838; border-radius: 4px; border: 1px solid #666; position: relative; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
-.bracket-team { padding: 12px; border-bottom: 1px solid #555; font-size: 0.9em; min-height: 42px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; transition: background-color 0.2s ease; }
-.bracket-team:last-child { border-bottom: none; }
-.bracket-team.draggable { cursor: grab; }
-.bracket-team.draggable:hover { background-color: #4f4f4f; }
-.bracket-team.placeholder { background-color: #303030; color: #888; }
-.team-name.placeholder { font-style: italic; }
-.bracket-team.winner { font-weight: bold; background-color: #3a5943; }
-.seed { font-weight: bold; color: #999; margin-right: 10px; }
-.team-name { flex-grow: 1; }
-.score { font-weight: bold; color: #fff; margin-left: 10px; }
-.match-number { position: absolute; top: 5px; left: 0; width: 100%; text-align: center; color: #ccc; font-size: 12px; }
-.bracket-spacer { flex-grow: 1; visibility: hidden; }
-.bracket-spacer-simple { height: 40px; flex-shrink: 0; }
+/* --- Font Smoothing --- */
+.tournament-wrapper {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* --- Main Layout --- */
+.tournament-wrapper { 
+    width: 100%; 
+}
+.bracket-area {
+    background-color: #f8f9fa;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-bottom: 2rem;
+}
+.bracket-header {
+    background-color: #e9ecef;
+    padding: 0.75rem 1.5rem;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: var(--bap-blue);
+    border-bottom: 1px solid var(--border-color);
+    border-top-left-radius: 8px;
+    border-top-right-radius: 8px;
+}
+.bracket-body {
+    display: flex;
+    flex-direction: row;
+    padding: 2rem;
+    overflow-x: auto;
+}
+.bracket-controls {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    text-align: center;
+}
+.bracket-controls p {
+    margin-top: 0.5rem;
+}
+
+/* --- Round Styling --- */
+.bracket-round {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    margin-right: 5rem; 
+    min-width: 250px; 
+    justify-content: space-around;
+}
+.bracket-round:last-child {
+    margin-right: 0;
+}
+.bracket-round-title { 
+    text-align: center; 
+    color: #495057; 
+    margin-bottom: 2rem; 
+    font-weight: 700; 
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
+
+/* --- Match Styling --- */
+.bracket-match {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    flex-grow: 1; 
+    margin-bottom: 1.5rem; /* Space for match number and connectors */
+}
+.bracket-teams {
+    background-color: var(--bg-light);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    position: relative;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.bracket-team {
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.9rem;
+    min-height: 48px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: background-color 0.2s ease;
+}
+.bracket-team:last-child { 
+    border-bottom: none; 
+}
+.bracket-team.draggable { 
+    cursor: grab; 
+}
+.bracket-team.draggable:hover {
+    background-color: #e9ecef;
+}
+.bracket-team.placeholder { 
+    background-color: #f8f9fa; 
+    color: #888; 
+}
+.team-name.placeholder { 
+    font-style: italic; 
+    font-size: 0.85rem;
+}
+.bracket-team.winner { 
+    background-color: #d1fae5;
+    font-weight: 600;
+}
+.seed { 
+    font-weight: 600; 
+    color: #6c757d; 
+    margin-right: 0.75rem; 
+}
+.team-name { 
+    flex-grow: 1; 
+}
+.score { 
+    font-weight: 700;
+    color: var(--bap-blue); 
+    margin-left: 1rem; 
+    background-color: #e9ecef;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    min-width: 28px;
+    text-align: center;
+}
+.winner .score {
+    background-color: #a7f3d0;
+}
+.match-number {
+    text-align: center;
+    color: #888;
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+    height: 1rem; /* Ensures space is always reserved */
+}
+
+/* --- Spacers for Alignment --- */
+.bracket-spacer {
+    flex-grow: 1;
+    visibility: hidden;
+}
+.bracket-spacer-simple { 
+    height: 40px; 
+    flex-shrink: 0;
+}
+.bracket-match-group {
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+}
 </style>

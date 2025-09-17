@@ -103,7 +103,7 @@ if (!$scheduleGenerated):
         }
     }
     ?>
-    <p>Drag and drop any team in its starting position to swap matchups.</p>
+    <p class="info-message" style="text-align: left; padding: 0 0 1.5rem 0;">Drag and drop any team in its starting position to swap matchups.</p>
     
     <div class="bracket-container">
         <?php // --- PRELIMINARY ROUND LOGIC (SETUP MODE) --- ?>
@@ -123,15 +123,13 @@ if (!$scheduleGenerated):
                         $match2 = $bracket_structure['prelim'][$slot_seed_away];
                         echo '<div class="bracket-match-group">';
                         
-                        echo '<div class="bracket-match">';
-                        echo '<div class="match-number">Match ' . $match1['match_number'] . '</div>';
+                        echo '<div class="bracket-match"><div class="match-number">Match ' . $match1['match_number'] . '</div>';
                         echo '<div class="bracket-teams">';
                         echo '<div class="bracket-team draggable" draggable="true" data-position-id="' . $match1['home']['pos'] . '"><span class="seed">(' . htmlspecialchars($match1['home']['seed']) . ')</span><span class="team-name">' . htmlspecialchars($match1['home']['name']) . '</span></div>';
                         echo '<div class="bracket-team draggable" draggable="true" data-position-id="' . $match1['away']['pos'] . '"><span class="seed">(' . htmlspecialchars($match1['away']['seed']) . ')</span><span class="team-name">' . htmlspecialchars($match1['away']['name']) . '</span></div>';
                         echo '</div></div>';
 
-                        echo '<div class="bracket-match">';
-                        echo '<div class="match-number">Match ' . $match2['match_number'] . '</div>';
+                        echo '<div class="bracket-match"><div class="match-number">Match ' . $match2['match_number'] . '</div>';
                         echo '<div class="bracket-teams">';
                         echo '<div class="bracket-team draggable" draggable="true" data-position-id="' . $match2['home']['pos'] . '"><span class="seed">(' . htmlspecialchars($match2['home']['seed']) . ')</span><span class="team-name">' . htmlspecialchars($match2['home']['name']) . '</span></div>';
                         echo '<div class="bracket-team draggable" draggable="true" data-position-id="' . $match2['away']['pos'] . '"><span class="seed">(' . htmlspecialchars($match2['away']['seed']) . ')</span><span class="team-name">' . htmlspecialchars($match2['away']['name']) . '</span></div>';
@@ -142,8 +140,7 @@ if (!$scheduleGenerated):
                     elseif ($home_is_prelim || $away_is_prelim) {
                         $correct_prelim_seed = $home_is_prelim ? $slot_seed_home : $slot_seed_away;
                         $match = $bracket_structure['prelim'][$correct_prelim_seed];
-                        echo '<div class="bracket-match">';
-                        echo '<div class="match-number">Match ' . $match['match_number'] . '</div>';
+                        echo '<div class="bracket-match"><div class="match-number">Match ' . $match['match_number'] . '</div>';
                         echo '<div class="bracket-teams">';
                         echo '<div class="bracket-team draggable" draggable="true" data-position-id="' . $match['home']['pos'] . '"><span class="seed">(' . htmlspecialchars($match['home']['seed']) . ')</span><span class="team-name">' . htmlspecialchars($match['home']['name']) . '</span></div>';
                         echo '<div class="bracket-team draggable" draggable="true" data-position-id="' . $match['away']['pos'] . '"><span class="seed">(' . htmlspecialchars($match['away']['seed']) . ')</span><span class="team-name">' . htmlspecialchars($match['away']['name']) . '</span></div>';
@@ -251,8 +248,7 @@ else:
                     <h4 class="bracket-round-title">Preliminary Round</h4>
                     <?php
                     $render_match = function($match, $matchNumberMap) {
-                        echo '<div class="bracket-match">';
-                        echo '<div class="match-number">Match ' . ($matchNumberMap[$match['id']] ?? '') . '</div>';
+                        echo '<div class="bracket-match"><div class="match-number">Match ' . ($matchNumberMap[$match['id']] ?? '') . '</div>';
                         echo '<div class="bracket-teams">';
                         echo '<div class="bracket-team ' . (($match['winnerteam_id'] && $match['winnerteam_id'] == $match['hometeam_id']) ? 'winner' : '') . '">';
                         echo '<span class="seed">(' . htmlspecialchars($match['hometeam_seed']) . ')</span>';
@@ -385,24 +381,24 @@ else:
 endif;
 ?>
 
-<div style="margin-top: 20px;">
+<div class="bracket-controls">
     <?php if (!$bracketLocked): ?>
         <form action="lock_bracket.php" method="POST" onsubmit="return confirm('Are you sure you want to lock this bracket? Matchups cannot be changed after locking.')">
             <input type="hidden" name="category_id" value="<?= $category_id ?>">
-            <button type="submit">Lock Bracket & Proceed to Schedule</button>
+            <button type="submit" class="btn btn-primary">Lock Bracket & Proceed to Schedule</button>
         </form>
     <?php else: ?>
         <?php if ($hasFinalGames): ?>
-            <button type="button" disabled>Unlock Bracket</button>
-            <p style="color: #6c757d; font-size: 0.9em; margin-top: 5px;">Cannot unlock bracket because games have been played.</p>
+            <button type="button" class="btn" disabled>Unlock Bracket</button>
+            <p>Cannot unlock bracket because games have been played.</p>
         <?php else: ?>
             <form action="unlock_bracket.php" method="POST" onsubmit="return confirm('Unlocking will allow you to change matchups. Are you sure?')">
                 <input type="hidden" name="category_id" value="<?= $category_id ?>">
-                <button type="submit" style="background-color: #ffc107; color: #212529;">Unlock Bracket</button>
+                <button type="submit" class="btn btn-secondary">Unlock Bracket</button>
             </form>
         <?php endif; ?>
         <?php if (!$scheduleGenerated): ?>
-            <p style="color:green; margin-top: 10px;"><strong>Bracket is locked. You can now generate the schedule in the 'Schedule' tab.</strong></p>
+            <p class="success-message"><strong>Bracket is locked. You can now generate the schedule in the 'Schedule' tab.</strong></p>
         <?php endif; ?>
     <?php endif; ?>
 </div>
@@ -457,17 +453,38 @@ document.addEventListener('DOMContentLoaded', () => {
 <?php endif; ?>
 
 <style>
+/* --- Font Smoothing --- */
+.bracket-container {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
 /* --- Main Layout --- */
-.bracket-wrapper { display: flex; flex-direction: column; align-items: flex-start; }
+.bracket-wrapper { 
+    display: flex; 
+    flex-direction: column; 
+    align-items: flex-start; 
+}
 .bracket-container {
     display: flex;
     flex-direction: row;
     overflow-x: auto;
-    background-color: #2c2c2c;
-    padding: 20px;
+    background-color: #f8f9fa;
+    padding: 2rem;
     border-radius: 8px;
-    color: #fff;
+    border: 1px solid var(--border-color);
     width: 100%;
+}
+.bracket-controls {
+    margin-top: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    text-align: center;
+}
+.bracket-controls p {
+    margin-top: 0.5rem;
 }
 
 /* --- Round Styling --- */
@@ -475,44 +492,100 @@ document.addEventListener('DOMContentLoaded', () => {
     display: flex;
     flex-direction: column;
     flex-shrink: 0;
-    margin-right: 50px;
-    min-width: 220px;
+    margin-right: 5rem; 
+    min-width: 250px; 
+    justify-content: space-around;
+    position: relative; 
 }
-.bracket-round-title { text-align: center; color: #aaa; margin-bottom: 25px; font-weight: 600; }
+.bracket-round:last-child {
+    margin-right: 0;
+}
+.bracket-round-title { 
+    text-align: center; 
+    color: #495057; 
+    margin-bottom: 2rem; 
+    font-weight: 700; 
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+}
 
-/* --- Match & Team Styling --- */
+/* --- Match Styling --- */
 .bracket-match {
     display: flex;
     flex-direction: column;
     justify-content: center;
     position: relative;
     flex-grow: 1; 
-    padding-top: 25px;
+    margin-bottom: 1.5rem; /* Space for match number and connectors */
 }
 .bracket-teams {
-    background-color: #444;
-    border-radius: 4px;
-    border: 1px solid #666;
+    background-color: var(--bg-light);
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
     position: relative;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 .bracket-team {
-    padding: 12px;
-    border-bottom: 1px solid #666;
-    font-size: 0.9em;
-    min-height: 42px;
+    padding: 0.8rem 1rem;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.9rem;
+    min-height: 48px;
     box-sizing: border-box;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    transition: background-color 0.2s ease;
 }
-.bracket-team:last-child { border-bottom: none; }
-.bracket-team.draggable { cursor: grab; }
-.bracket-team.placeholder { background-color: #383838; color: #888; }
-.team-name.placeholder { font-style: italic; }
-.bracket-team.winner { background-color: #3a5943; }
-.seed { font-weight: bold; color: #999; margin-right: 10px; }
-.team-name { flex-grow: 1; }
-.score { font-weight: bold; color: #fff; margin-left: 10px; }
+.bracket-team:last-child { 
+    border-bottom: none; 
+}
+.bracket-team.draggable { 
+    cursor: grab; 
+}
+.bracket-team.draggable:hover {
+    background-color: #e9ecef;
+}
+.bracket-team.placeholder { 
+    background-color: #f8f9fa; 
+    color: #888; 
+}
+.team-name.placeholder { 
+    font-style: italic; 
+    font-size: 0.85rem;
+}
+.bracket-team.winner { 
+    background-color: #d1fae5;
+    font-weight: 600;
+}
+.seed { 
+    font-weight: 600; 
+    color: #6c757d; 
+    margin-right: 0.75rem; 
+}
+.team-name { 
+    flex-grow: 1; 
+}
+.score { 
+    font-weight: 700;
+    color: var(--bap-blue); 
+    margin-left: 1rem; 
+    background-color: #e9ecef;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    min-width: 28px;
+    text-align: center;
+}
+.winner .score {
+    background-color: #a7f3d0;
+}
+.match-number {
+    text-align: center;
+    color: #888;
+    font-size: 0.75rem;
+    margin-bottom: 0.25rem;
+    height: 1rem; /* Ensures space is always reserved */
+}
 
 /* --- SPACER for ALIGNMENT --- */
 .bracket-spacer {
@@ -528,14 +601,13 @@ document.addEventListener('DOMContentLoaded', () => {
     justify-content: space-around;
 }
 
-/* --- Match Number Badge --- */
-.match-number {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    text-align: center;
-    color: #ccc;
-    font-size: 12px;
+/* --- Third Place Match --- */
+.third-place-container {
+    margin-top: 2rem;
+    padding-top: 2rem;
+    border-top: 1px dashed var(--border-color);
+    display: flex;
+    justify-content: center;
 }
 </style>
+

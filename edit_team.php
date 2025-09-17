@@ -1,7 +1,7 @@
 <?php
 require 'db.php';
-session_start(); // << START SESSION
-require_once 'logger.php'; // << INCLUDE THE LOGGER
+session_start();
+require_once 'logger.php'; 
 
 $team_id = filter_input(INPUT_GET, 'team_id', FILTER_VALIDATE_INT);
 if (!$team_id) {
@@ -27,13 +27,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $update = $pdo->prepare("UPDATE team SET team_name = ? WHERE id = ?");
             $update->execute([$new_name, $team_id]);
 
-            // --- DETAILED SUCCESS LOGGING ---
-            // Compare the original name from $team with the new name
             if ($team['team_name'] !== $new_name) {
                 $log_details = "Updated team in category ID {$team['category_id']}: changed name from '{$team['team_name']}' to '{$new_name}' (Team ID: {$team_id}).";
                 log_action('UPDATE_TEAM', 'SUCCESS', $log_details);
             } else {
-                // Log if the user clicked "Update" but made no changes
                 $log_details = "Submitted update for team '{$team['team_name']}' (ID: {$team_id}) with no changes.";
                 log_action('UPDATE_TEAM', 'INFO', $log_details);
             }
@@ -43,10 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             die("A database error occurred.");
         }
 
-        header("Location: category_details.php?category_id=" . $team['category_id'] . "#teams");
+        header("Location: category_details.php?category_id=" . $team['category_id'] . "&tab=teams");
         exit;
     } else {
-        // --- FAILURE LOGGING ---
         $error = "Team name cannot be empty.";
         $log_details = "Failed to update team (ID: {$team_id}) because the name was empty.";
         log_action('UPDATE_TEAM', 'FAILURE', $log_details);
@@ -55,27 +51,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 ?>
 
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edit Team</title>
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="login-page">
-    <div class="login-container">
+<body>
+    <?php include 'includes/header.php'; ?>
+    <div class="form-container">
         <h1>Edit Team</h1>
 
         <?php if (!empty($error)): ?>
-            <p style="color:red;"><?= htmlspecialchars($error) ?></p>
+            <div class="form-error"><?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
 
         <form method="POST">
-            <label>Team Name</label>
-            <input type="text" name="team_name" value="<?= htmlspecialchars($team['team_name']) ?>" required>
-            <button class="login-button" type="submit">Update</button>
+            <div class="form-group">
+                <label for="team_name">Team Name</label>
+                <input type="text" id="team_name" name="team_name" value="<?= htmlspecialchars($team['team_name']) ?>" required>
+            </div>
+            <div class="form-actions">
+                <button class="btn btn-primary" type="submit">Update Team</button>
+                 <a href="category_details.php?category_id=<?= $team['category_id'] ?>&tab=teams" class="back-link">Cancel</a>
+            </div>
         </form>
-        <p><a href="category_details.php?category_id=<?= $team['category_id'] ?>#teams">← Back to Category</a></p>
     </div>
 </body>
 </html>
