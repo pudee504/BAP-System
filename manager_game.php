@@ -112,6 +112,11 @@ if ($teams_are_set) {
     $qrCode = QrCode::create($control_url);
     $writer = new PngWriter();
     $qrCodeDataUri = $writer->write($qrCode)->getDataUri();
+
+    // 2. NEW Spectator View URL
+    $spectator_url = "{$protocol}{$host}{$uri}/spectator_view.php?game_id={$game_id}";
+    $qrCodeSpectator = QrCode::create($spectator_url);
+    $qrCodeSpectatorUri = $writer->write($qrCodeSpectator)->getDataUri();
 }
 ?>
 <!DOCTYPE html>
@@ -180,6 +185,11 @@ if ($teams_are_set) {
                 <h4>Scan for Timer Control</h4>
                 <img src="<?php echo $qrCodeDataUri; ?>" alt="QR Code for Timer Control">
             </div>
+
+        <div class="qr-code-container">
+        <h4>Spectator View (Team Watchers)</h4>
+        <img src="<?php echo $qrCodeSpectatorUri; ?>" alt="QR Code for Spectator View">
+    </div>
             <div class="game-actions">
                 <button class="btn btn-secondary" onclick="showOverridePanel()">Override Result</button>
             </div>
