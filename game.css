@@ -129,6 +129,22 @@
     border-radius: 0 0 8px 8px;
 }
 
+.table-wrapper {
+    max-height: 65vh; /* Sets a maximum height (e.g., 45% of the viewport height) */
+    overflow-y: auto; /* Adds a vertical scrollbar only when needed */
+    position: relative; /* Establishes a positioning context for the sticky header */
+}
+
+/* Step 2: Make the table headers sticky */
+.category-table thead th {
+    position: sticky; /* The magic property */
+    top: 0; /* Sticks the header to the top of the .table-wrapper */
+    z-index: 2; /* Ensures the header stays above the scrolling rows */
+
+    /* This is important to prevent scrolling rows from showing through the header */
+    background-color: #f8f9fa; 
+}
+
 .team-box table {
     font-size: 0.70rem; /* Slightly reduced from 0.875rem for more space */
     table-layout: fixed;

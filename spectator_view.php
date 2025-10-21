@@ -262,11 +262,11 @@ if (!$game) { die("Game not found."); }
                 
                 document.getElementById('timeoutsA').textContent = data.team_stats.home_timeouts;
                 document.getElementById('foulsA').textContent = data.team_stats.home_fouls;
-                document.getElementById('bonus-teamA').style.display = data.team_stats.home_fouls >= 4 ? 'inline' : 'none';
+                document.getElementById('bonus-teamA').style.display = data.team_stats.away_fouls >= 4 ? 'inline' : 'none';
 
                 document.getElementById('timeoutsB').textContent = data.team_stats.away_timeouts;
                 document.getElementById('foulsB').textContent = data.team_stats.away_fouls;
-                document.getElementById('bonus-teamB').style.display = data.team_stats.away_fouls >= 4 ? 'inline' : 'none';
+                document.getElementById('bonus-teamB').style.display = data.team_stats.home_fouls >= 4 ? 'inline' : 'none';
                 
                 renderPlayers(data.players);
             }

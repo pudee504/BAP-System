@@ -1,6 +1,8 @@
 <?php
 header('Content-Type: application/json');
-require_once 'db.php'; // Make sure this path to your database connection is correct
+require_once 'db.php';
+// STEP 1: Include the winner logic file
+require_once 'winner_logic.php'; 
 
 $input = json_decode(file_get_contents('php://input'), true);
 $game_id = $input['game_id'] ?? null;
@@ -34,8 +36,7 @@ try {
     } elseif ((int)$game['awayteam_score'] > (int)$game['hometeam_score']) {
         $winner_id = $game['awayteam_id'];
     }
-    // Note: If scores are equal, no winner is set. Your UI already prevents finalizing a tied game.
-
+    
     // 3. Update the game record with the status and winner's ID
     $updateStmt = $pdo->prepare("
         UPDATE game 
@@ -44,16 +45,23 @@ try {
     ");
     $updateStmt->execute([$winner_id, $game_id]);
     
-    // 4. Also stop the timer in the game_timer table for good measure
+    // 4. Also stop the timer
     $timerStmt = $pdo->prepare("UPDATE game_timer SET running = 0 WHERE game_id = ?");
     $timerStmt->execute([$game_id]);
 
+    // STEP 2: Call the function to advance the winner/loser to the next game
+    if ($winner_id) {
+        processGameResult($pdo, $game_id);
+    }
+
     $pdo->commit();
 
-    echo json_encode(['success' => true, 'message' => 'Game finalized successfully.']);
+    echo json_encode(['success' => true, 'message' => 'Game finalized and bracket updated successfully.']);
 
 } catch (Exception $e) {
-    $pdo->rollBack();
+    if ($pdo->inTransaction()) {
+        $pdo->rollBack();
+    }
     echo json_encode(['success' => false, 'error' => $e->getMessage()]);
 }
 ?>

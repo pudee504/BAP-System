@@ -1,0 +1,207 @@
+
+       /* orbitron-regular - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Orbitron';
+  font-style: normal;
+  font-weight: 400;
+  src: url('./fonts/orbitron-v35-latin-regular.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* orbitron-700 - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Orbitron';
+  font-style: normal;
+  font-weight: 700;
+  src: url('./fonts/orbitron-v35-latin-700.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+/* orbitron-900 - latin */
+@font-face {
+  font-display: swap; /* Check https://developer.mozilla.org/en-US/docs/Web/CSS/@font-face/font-display for other options. */
+  font-family: 'Orbitron';
+  font-style: normal;
+  font-weight: 900;
+  src: url('./fonts/orbitron-v35-latin-900.woff2') format('woff2'); /* Chrome 36+, Opera 23+, Firefox 39+, Safari 12+, iOS 10+ */
+}
+        
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            background-color: #000;
+            color: #fff;
+            font-family: 'Orbitron', sans-serif;
+            overflow: hidden;
+            text-transform: uppercase;
+        }
+
+        .scoreboard {
+            display: grid;
+            grid-template-columns: 1fr 1.2fr 1fr; /* Give center column more space */
+            align-items: center; /* Vertically align grid cells */
+            height: 100%;
+            width: 100%;
+            padding: 2vh 2vw;
+            box-sizing: border-box;
+        }
+
+        /* FLEXBOX for each team column to control vertical alignment */
+        .team {
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between; /* Distributes items vertically */
+            height: 100%;
+            text-align: center;
+        }
+
+        .team-name {
+            font-size: 6vh;
+            font-weight: 700;
+            line-height: 1.2;
+            padding: 2vh 0;
+            /* **THE FIX for alignment**: ensures both name boxes have the same height */
+            min-height: 15vh; 
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .team-score {
+            font-size: 30vh;
+            font-weight: 900;
+            color: #FFD700;
+            line-height: 1;
+            flex-grow: 1; /* Allows score to fill available space */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .game-info {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: 90%;
+            border-left: 4px solid #333;
+            border-right: 4px solid #333;
+        }
+
+        #gameClock {
+            font-size: 14vh;
+            font-weight: 900;
+            color: #ff4141;
+        }
+        
+        #quarterLabel {
+            font-size: 6vh;
+            font-weight: 700;
+        }
+
+        #shotClock {
+            font-size: 10vh;
+            font-weight: 900;
+            color: #ffa500;
+        }
+
+        /* **THE FIX for stats layout**: styles for the spelled-out stats */
+        .sub-info {
+            display: flex;
+            justify-content: space-evenly; /* Evenly space the stat boxes */
+            padding-bottom: 2vh;
+        }
+        
+        .stat-box {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .stat-label {
+            font-size: 4vh;
+            font-weight: 700;
+        }
+
+        .stat-value {
+            font-size: 6vh;
+            font-weight: 900;
+        }
+
+        .bonus {
+            color: #ff4141;
+            font-size: 2.5vh;
+            font-weight: 700;
+            margin-top: 1vh;
+            /* IMPORTANT: Set visibility, not display, to prevent layout shifts */
+            visibility: hidden; 
+        }
+        
+        .bonus.visible {
+            visibility: visible;
+        }
+
+        /*NEXT
+        /* orbitron-900 - latin */
+        @font-face {
+        font-display: swap;
+        font-family: 'Orbitron';
+        font-style: normal;
+        font-weight: 900;
+        src: url('./fonts/orbitron-v35-latin-900.woff2') format('woff2');
+        }
+
+        
+        html, body {
+            margin: 0; padding: 0; height: 100%; width: 100%; background-color: #000; color: #fff;
+            font-family: 'Orbitron', sans-serif; font-weight: 900; overflow: hidden; text-transform: uppercase;
+        }
+        
+        .team-name, .team-score, #gameClock, #quarterLabel, #shotClock, .stat-label, .stat-value {
+             -webkit-text-stroke: 1px black; text-stroke: 1px black; paint-order: stroke fill;       
+        }
+
+        .scoreboard {
+            display: grid; grid-template-columns: 1fr 1.2fr 1fr; align-items: center;
+            height: 100%; width: 100%; padding: 2vh 2vw; box-sizing: border-box;
+        }
+
+        .team {
+            display: flex; flex-direction: column; justify-content: space-between;
+            height: 100%; text-align: center;
+        }
+
+        .team-name {
+            font-size: 6vh; line-height: 1.2; padding: 2vh 0; min-height: 15vh; 
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .team-score {
+            font-size: 30vh; color: #fff; line-height: 1; flex-grow: 1;
+            display: flex; align-items: center; justify-content: center;
+        }
+
+        .game-info {
+            text-align: center; display: flex; flex-direction: column;
+            justify-content: space-between; height: 90%;
+            border-left: 4px solid #fff; border-right: 4px solid #fff;
+        }
+
+        
+
+        #gameClock { font-size: 14vh; color: #fff; }
+        #quarterLabel { font-size: 6vh; }
+        #shotClock { font-size: 10vh; color: #fff; }
+        .sub-info { display: flex; justify-content: space-evenly; padding-bottom: 2vh; }
+        .stat-box { display: flex; flex-direction: column; align-items: center; }
+        .stat-label { font-size: 4vh; }
+        .stat-value { font-size: 6vh; }
+
+        .bonus {
+            color: #fff; font-size: 2.5vh; margin-top: 1vh; visibility: hidden; 
+            -webkit-text-stroke: 1px red; text-stroke: 1px red;
+        }
+        .bonus.visible { visibility: visible; } 
+        
+
+

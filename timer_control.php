@@ -169,8 +169,8 @@ if (!$game_id) { die("Invalid game ID."); }
         </div>
         <div class="control-group">
             <h4>Possession</h4>
-            <button onclick="sendAction('resetShotClock', { isOffensive: false })">Change Possesion (24s)</button>
-            <button onclick="sendAction('resetShotClock', { isOffensive: true })">Same Posession (14s)</button>
+            <button onclick="handlePossessionReset(false)">Change Possesion (24s)</button>
+            <button onclick="handlePossessionReset(true)">Same Posession (14s)</button>
         </div>
         <div class="control-group">
             <h4>Game Clock Adjust</h4>
@@ -198,6 +198,9 @@ if (!$game_id) { die("Invalid game ID."); }
         let isClockRunning = false;
         let gameClockMs = 0;
         let shotClockMs = 0;
+
+        // NEW: State variable to track if the shot clock is "held" after a reset
+        let shotClockHeld = false;
 
         function formatGameTime(ms) {
             if (ms <= 0) return "00:00.0";
@@ -232,6 +235,11 @@ if (!$game_id) { die("Invalid game ID."); }
             toggleBtn.textContent = state.running ? 'Pause' : 'Start';
             toggleBtn.classList.toggle('running', state.running);
             isClockRunning = state.running;
+
+            // MODIFIED: If the server reports the clock is stopped, we must cancel any local hold.
+            if (!isClockRunning) {
+                shotClockHeld = false;
+            }
             
             const nextBtn = document.getElementById('nextQuarterBtn');
             const finalizeBtn = document.getElementById('finalizeGameBtn');
@@ -252,7 +260,36 @@ if (!$game_id) { die("Invalid game ID."); }
             }
         }
 
+        // NEW: This function implements the two-click logic for possession changes.
+        function handlePossessionReset(isOffensive) {
+            // If the game clock isn't running, the two-click system isn't needed. Reset immediately.
+            if (!isClockRunning) {
+                shotClockHeld = false; 
+                sendAction('resetShotClock', { isOffensive });
+                return;
+            }
+
+            // If the clock IS running, this implements the "hold" logic.
+            if (!shotClockHeld) {
+                // FIRST CLICK: Set the hold flag and send the reset command.
+                // The local timer will now be prevented from running the shot clock down.
+                shotClockHeld = true;
+                sendAction('resetShotClock', { isOffensive });
+            } else {
+                // SECOND CLICK (or an override click on the other button):
+                // Release the hold and send the reset command again. This ensures the
+                // shot clock starts from its full value (24/14).
+                shotClockHeld = false;
+                sendAction('resetShotClock', { isOffensive });
+            }
+        }
+
         async function sendAction(action, payload = {}) {
+            // Any action that isn't a possession reset should cancel the hold state.
+            if (action !== 'resetShotClock') {
+                shotClockHeld = false;
+            }
+            
             try {
                 const body = { 
                     game_id: gameId, 
@@ -285,9 +322,9 @@ if (!$game_id) { die("Invalid game ID."); }
                 if (state && !isClockRunning) {
                     updateUI(state);
                 }
-            } catch (error) {
+             } catch (error) {
                 console.error('Failed to fetch timer state:', error);
-            }
+             }
         }
 
         async function finalizeGame() {
@@ -323,12 +360,18 @@ if (!$game_id) { die("Invalid game ID."); }
             localTimerInterval = setInterval(() => {
                 if (isClockRunning) {
                     gameClockMs = Math.max(0, gameClockMs - 100);
-                    shotClockMs = Math.max(0, shotClockMs - 100);
-                    updateDisplay();
-                    if (gameClockMs === 0) {
-                        isClockRunning = false;
-                        fetchLatestTimerState();
+                    
+                    // MODIFIED: Only decrement the shot clock if it is NOT being held.
+                    if (!shotClockHeld) {
+                        shotClockMs = Math.max(0, shotClockMs - 100);
                     }
+                    
+                    updateDisplay();
+                    if (gameClockMs === 0 && isClockRunning) {
+    // Stop the local clock and, most importantly, tell the server.
+    isClockRunning = false; 
+    sendAction('toggle'); // This tells the server to stop the clock and syncs the time to 0.
+}
                 }
             }, 100);
         }

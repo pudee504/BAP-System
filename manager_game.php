@@ -76,24 +76,24 @@ if ($teams_are_set) {
     $timeoutsB = loadTimeouts($pdo, $game_id, $game['awayteam_id'], $timeout_period);
 
     $player_query = "
-        SELECT 
-            p.id, p.first_name, p.last_name, pg.jersey_number, pg.is_playing, pg.display_order,
-            COALESCE(SUM(CASE WHEN s.statistic_name = '1PM' THEN gs.value ELSE 0 END), 0) AS '1PM',
-            COALESCE(SUM(CASE WHEN s.statistic_name = '2PM' THEN gs.value ELSE 0 END), 0) AS '2PM',
-            COALESCE(SUM(CASE WHEN s.statistic_name = '3PM' THEN gs.value ELSE 0 END), 0) AS '3PM',
-            COALESCE(SUM(CASE WHEN s.statistic_name = 'FOUL' THEN gs.value ELSE 0 END), 0) AS 'FOUL',
-            COALESCE(SUM(CASE WHEN s.statistic_name = 'REB' THEN gs.value ELSE 0 END), 0) AS 'REB',
-            COALESCE(SUM(CASE WHEN s.statistic_name = 'AST' THEN gs.value ELSE 0 END), 0) AS 'AST',
-            COALESCE(SUM(CASE WHEN s.statistic_name = 'BLK' THEN gs.value ELSE 0 END), 0) AS 'BLK',
-            COALESCE(SUM(CASE WHEN s.statistic_name = 'STL' THEN gs.value ELSE 0 END), 0) AS 'STL',
-            COALESCE(SUM(CASE WHEN s.statistic_name = 'TO' THEN gs.value ELSE 0 END), 0) AS 'TO'
-        FROM player_game pg
-        JOIN player p ON p.id = pg.player_id
-        LEFT JOIN game_statistic gs ON pg.player_id = gs.player_id AND pg.game_id = gs.game_id
-        LEFT JOIN statistic s ON gs.statistic_id = s.id
-        WHERE pg.game_id = ? AND pg.team_id = ?
-        GROUP BY p.id, p.first_name, p.last_name, pg.jersey_number, pg.is_playing, pg.display_order
-        ORDER BY pg.is_playing DESC, pg.display_order ASC";
+    SELECT 
+        p.id, p.first_name, p.last_name, pg.jersey_number, pg.is_playing, pg.display_order,
+        COALESCE(SUM(CASE WHEN s.statistic_name = '1PM' THEN gs.value ELSE 0 END), 0) AS '1PM',
+        COALESCE(SUM(CASE WHEN s.statistic_name = '2PM' THEN gs.value ELSE 0 END), 0) AS '2PM',
+        COALESCE(SUM(CASE WHEN s.statistic_name = '3PM' THEN gs.value ELSE 0 END), 0) AS '3PM',
+        COALESCE(SUM(CASE WHEN s.statistic_name = 'FOUL' THEN gs.value ELSE 0 END), 0) AS 'FOUL',
+        COALESCE(SUM(CASE WHEN s.statistic_name = 'REB' THEN gs.value ELSE 0 END), 0) AS 'REB',
+        COALESCE(SUM(CASE WHEN s.statistic_name = 'AST' THEN gs.value ELSE 0 END), 0) AS 'AST',
+        COALESCE(SUM(CASE WHEN s.statistic_name = 'BLK' THEN gs.value ELSE 0 END), 0) AS 'BLK',
+        COALESCE(SUM(CASE WHEN s.statistic_name = 'STL' THEN gs.value ELSE 0 END), 0) AS 'STL',
+        COALESCE(SUM(CASE WHEN s.statistic_name = 'TO' THEN gs.value ELSE 0 END), 0) AS 'TO'
+    FROM player_game pg
+    JOIN player p ON p.id = pg.player_id
+    LEFT JOIN game_statistic gs ON pg.player_id = gs.player_id AND pg.game_id = gs.game_id
+    LEFT JOIN statistic s ON gs.statistic_id = s.id
+    WHERE pg.game_id = ? AND pg.team_id = ?
+    GROUP BY p.id, pg.jersey_number, pg.is_playing, pg.display_order
+    ORDER BY pg.is_playing DESC, pg.display_order ASC";
         
     $stmt = $pdo->prepare($player_query);
     $stmt->execute([$game_id, $game['hometeam_id']]);
@@ -191,6 +191,7 @@ if ($teams_are_set) {
         <img src="<?php echo $qrCodeSpectatorUri; ?>" alt="QR Code for Spectator View">
     </div>
             <div class="game-actions">
+                <button class="btn" onclick="openScoreboardWindow()">Open Projector View</button>
                 <button class="btn btn-secondary" onclick="showOverridePanel()">Override Result</button>
             </div>
         </div>
@@ -214,6 +215,20 @@ if ($teams_are_set) {
             let gameClockMs = 0;
             let currentQuarter = <?php echo json_encode($current_quarter); ?>;
             let pollingInterval = null;
+            
+
+            function openScoreboardWindow() {
+        const url = `scoreboard.php?game_id=${gameData.gameId}`;
+        
+        // Directly try to open the window.
+        const scoreboardWindow = window.open(url, 'BAP_Scoreboard');
+
+        // Check if the window was successfully opened.
+        if (!scoreboardWindow || scoreboardWindow.closed || typeof scoreboardWindow.closed == 'undefined') {
+            // If the window is null or closed, it was likely blocked.
+            alert('Pop-up Blocked! Please allow pop-ups for this site to open the scoreboard.');
+        }
+    }
 
             function calculatePoints(stats) { return stats['1PM'] * 1 + stats['2PM'] * 2 + stats['3PM'] * 3; }
             
@@ -236,7 +251,7 @@ if ($teams_are_set) {
                     const isFouledOut = stats['FOUL'] >= 5;
                     tr.innerHTML = `
                         <td><input type="checkbox" class="in-game-checkbox" ${player.isPlaying ? 'checked' : ''} onchange="togglePlayer('${teamId}', ${idx}, this.checked)" ${gameData.gameStatus === 'Final' ? 'disabled' : ''}></td>
-                        <td><input type="text" class="jersey-input" value="${player.jersey}" onchange="updateJersey('${teamId}', ${idx}, this.value)" ${gameData.gameStatus === 'Final' ? 'disabled' : ''}></td>
+                        <td><input type="text" class="jersey-input" value="${player.jersey}" oninput="updateJersey('${teamId}', ${idx}, this.value)"></td>
                         <td class="name-cell">${player.name}</td>
                         ${['1PM','2PM','3PM','FOUL','REB','AST','BLK','STL','TO'].map(stat => `
                             <td class="stat-cell" onmouseover="showButtons(this)" onmouseleave="hideButtons(this)">
@@ -280,9 +295,13 @@ if ($teams_are_set) {
                 fetch("update_jersey_number.php",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({game_id:gameData.gameId,player_id:player.id,team_id:teamId==="teamA"?gameData.teamA.id:gameData.teamB.id,jersey_number:jerseyNumber})});
             }
             
-            function updateBonusUI(teamId) {
-                document.getElementById(`bonus-${teamId}`).style.display = teamFouls[teamId] >= 4 ? "inline" : "none";
-            }
+           function updateBonusUI() {
+    // Check if Team B's fouls put Team A in the bonus
+    document.getElementById('bonus-teamA').style.display = teamFouls['teamB'] >= 4 ? "inline" : "none";
+    
+    // Check if Team A's fouls put Team B in the bonus
+    document.getElementById('bonus-teamB').style.display = teamFouls['teamA'] >= 4 ? "inline" : "none";
+}
             
             function updateStat(teamId, playerIdx, stat, delta) {
                 if(gameData.gameStatus === 'Final') return;
@@ -296,7 +315,7 @@ if ($teams_are_set) {
                 if (stat === 'FOUL') {
                     teamFouls[teamId] = Math.max(0, teamFouls[teamId] + delta);
                     document.getElementById(teamId === 'teamA' ? 'foulsA' : 'foulsB').textContent = teamFouls[teamId];
-                    updateBonusUI(teamId);
+                    updateBonusUI;
                     fetch("update_team_fouls.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ game_id: gameData.gameId, team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id, quarter: currentQuarter, fouls: teamFouls[teamId] }) });
                 }
                 fetch("update_stat.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ game_id: gameData.gameId, player_id: player.id, team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id, statistic_name: stat, value: delta })
@@ -407,29 +426,67 @@ if ($teams_are_set) {
             }
 
             async function fetchAndApplyState() {
-                try {
-                    const response = await fetch(`get_timer_state.php?game_id=${gameData.gameId}`);
-                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                    const state = await response.json();
-                    if (!state) return;
-                    if (state.running) {
-                        const elapsedMs = state.current_server_time - state.last_updated_at;
-                        gameClockMs = Math.max(0, state.game_clock - elapsedMs);
-                    } else { gameClockMs = state.game_clock; }
-                    if (state.quarter_id !== currentQuarter) {
-                        clearInterval(pollingInterval); 
-                        alert('Quarter has changed. Refreshing the page to sync.');
-                        location.reload();
-                        return;
-                    }
-                    document.getElementById('scoreA').textContent = state.hometeam_score;
-                    document.getElementById('scoreB').textContent = state.awayteam_score;
-                } catch (error) { console.error('State polling error:', error); }
-            }
+    try {
+        const response = await fetch(`get_timer_state.php?game_id=${gameData.gameId}&t=${new Date().getTime()}`);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        const state = await response.json();
+        if (!state) return;
+
+        // 1. Handle the timer (no changes here)
+        if (state.running) {
+            const elapsedMs = state.current_server_time - state.last_updated_at;
+            gameClockMs = Math.max(0, state.game_clock - elapsedMs);
+        } else {
+            gameClockMs = state.game_clock;
+        }
+
+        // 2. Handle quarter changes (no changes here)
+        if (state.quarter_id !== currentQuarter) {
+            clearInterval(pollingInterval); 
+            alert('Quarter has changed. Refreshing the page to sync.');
+            location.reload();
+            return;
+        }
+
+        // 3. NEW: Update fouls and timeouts from the server
+        // This ensures the bonus indicator is always live
+        if (state.fouls) {
+            teamFouls.teamA = state.fouls.home[state.quarter_id] || 0;
+            teamFouls.teamB = state.fouls.away[state.quarter_id] || 0;
+            document.getElementById('foulsA').textContent = teamFouls.teamA;
+            document.getElementById('foulsB').textContent = teamFouls.teamB;
+            updateBonusUI(); // Re-evaluate bonus status with fresh data
+        }
+
+        // Determine the current timeout period
+        let timeoutPeriod;
+        if (state.quarter_id <= 2) timeoutPeriod = 1;
+        else if (state.quarter_id <= 4) timeoutPeriod = 2;
+        else timeoutPeriod = state.quarter_id;
+
+        // Set default timeout values
+        let defaultTimeoutsA = (timeoutPeriod === 1) ? 2 : (timeoutPeriod === 2 ? 3 : 1);
+        let defaultTimeoutsB = (timeoutPeriod === 1) ? 2 : (timeoutPeriod === 2 ? 3 : 1);
+        
+        if(state.timeouts) {
+             document.getElementById('timeoutsA').textContent = state.timeouts.home[timeoutPeriod] ?? defaultTimeoutsA;
+             document.getElementById('timeoutsB').textContent = state.timeouts.away[timeoutPeriod] ?? defaultTimeoutsB;
+        }
+
+        /* * NOTE: We are intentionally NOT updating the main scores here.
+         * The scores are updated instantly by updateRunningScore() when you click a button.
+         * This prevents the score from flickering.
+        */
+
+    } catch (error) { 
+        console.error('State polling error:', error); 
+    }
+}
 
             window.addEventListener("DOMContentLoaded", () => {
                 renderTeam("teamA"); renderTeam("teamB");
-                updateBonusUI("teamA"); updateBonusUI("teamB");
+                updateBonusUI();
                 renderInitialLog(); updateRunningScore("teamA"); updateRunningScore("teamB");
                 if (gameData.gameStatus === 'Final') {
                     document.querySelectorAll('input, button').forEach(el => {
@@ -457,7 +514,7 @@ if ($teams_are_set) {
                     });
                 });
                 fetchAndApplyState();
-                pollingInterval = setInterval(fetchAndApplyState, 1000); 
+                pollingInterval = setInterval(fetchAndApplyState, 100); 
             });
         </script>
 
