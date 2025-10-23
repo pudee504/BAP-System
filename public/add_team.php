@@ -1,7 +1,7 @@
 <?php
-require 'db.php';
+require '../src/db.php';
 session_start();
-require_once 'logger.php';
+require_once '../src/logger.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header("Location: dashboard.php");

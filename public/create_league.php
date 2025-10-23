@@ -1,7 +1,7 @@
 <?php
 session_start();
-include 'db.php';
-require_once 'logger.php'; 
+include '../src/db.php';
+require_once '../src/logger.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: index.php");
@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<?php include 'includes/header.php'; ?>
+<?php include '../src/includes/header.php'; ?>
 
 <div class="form-container">
     <h1>Create a New League</h1>

@@ -1,7 +1,7 @@
 <?php
-require 'db.php';
+require '../src/db.php';
 session_start();
-require_once 'logger.php'; 
+require_once '../src/logger.php';
 
 $team_id = filter_var($_GET['team_id'] ?? null, FILTER_VALIDATE_INT);
 if (!$team_id) {
@@ -85,7 +85,7 @@ $free_agents = $free_agent_stmt->fetchAll();
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<?php include 'includes/header.php'; ?>
+<?php include '../src/includes/header.php'; ?>
 
 <div class="dashboard-container">
     <div class="page-header">

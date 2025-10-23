@@ -1,7 +1,7 @@
 <?php
-require 'db.php';
+require '../src/db.php';
 session_start();
-require_once 'logger.php';
+require_once '../src/logger.php';
 
 // Validate input
 $player_id = filter_var($_POST['player_id'] ?? null, FILTER_VALIDATE_INT);

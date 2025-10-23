@@ -1,7 +1,7 @@
 <?php
 session_start();
-require 'db.php';
-require_once 'logger.php'; 
+require '../src/db.php';
+require_once '../src/logger.php';
 
 // --- This block runs when the page is first loaded ---
 if (!isset($_GET['league_id']) || !filter_var($_GET['league_id'], FILTER_VALIDATE_INT, ["options" => ["min_range" => 1]])) {
@@ -127,7 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<?php include 'includes/header.php'; ?>
+<?php include '../src/includes/header.php'; ?>
 
 <div class="form-container">
     <h1>Add Category</h1>

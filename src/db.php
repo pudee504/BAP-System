@@ -1,6 +1,6 @@
 <?php
 // Load database configuration
-$config = include('config.php');
+$config = include('../config/config.php');
 
 try {
     $pdo = new PDO(

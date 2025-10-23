@@ -3,7 +3,7 @@
 session_start();
 
 // 2. Include your new logger.
-require_once 'logger.php';
+require_once '../src/logger.php';
 
 // --- START: DATABASE LOGGING ---
 

@@ -50,7 +50,7 @@ if (empty($bracket_positions)) {
 
 // 3. Render the interactive bracket preview.
 ?>
-<link rel="stylesheet" href="includes/bracket_renderer.css">
+<link rel="stylesheet" href="/css/bracket_renderer.css">
 <h3>Bracket Preview & Seeding</h3>
 <p>Drag and drop teams to set their starting positions. Teams playing in the first round are paired together. The remaining teams have a <strong>(BYE)</strong> and advance automatically.</p>
 

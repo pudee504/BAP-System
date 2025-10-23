@@ -1,6 +1,6 @@
 <?php
 session_start();
-include 'db.php';
+include '../src/db.php';
 
 if (!isset($_SESSION['user_id'])) {
     header("Location: index.php");
@@ -37,7 +37,7 @@ $categories = $catStmt->fetchAll();
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<?php include 'includes/header.php'; ?>
+<?php include '../src/includes/header.php'; ?>
 
 <div class="dashboard-container">
     <div class="page-header">

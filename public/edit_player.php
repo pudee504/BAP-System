@@ -1,7 +1,7 @@
 <?php
-require 'db.php';
+require '../src/db.php';
 session_start();
-require_once 'logger.php'; 
+require_once '../src/logger.php';
 
 $id = (int) ($_GET['id'] ?? 0);
 $team_id = (int) ($_GET['team_id'] ?? 0);
@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<?php include 'includes/header.php'; ?>
+<?php include '../src/includes/header.php'; ?>
 
 <div class="form-container">
     <h1>Edit Player</h1>

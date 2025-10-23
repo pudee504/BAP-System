@@ -1,7 +1,7 @@
 <?php
-require 'db.php';
+require '../src/db.php';
 session_start();
-require_once 'logger.php'; 
+require_once '../src/logger.php';
 
 $id = (int) ($_GET['id'] ?? 0);
 $team_id = (int) ($_GET['team_id'] ?? 0);

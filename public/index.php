@@ -1,6 +1,6 @@
 <?php
 session_start();
-include 'db.php';
+include '../src/db.php';
 
 // Generate a CSRF token if it doesn't exist yet
 if (empty($_SESSION['csrf_token'])) {

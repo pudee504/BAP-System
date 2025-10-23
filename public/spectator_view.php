@@ -1,5 +1,5 @@
 <?php
-require_once 'db.php';
+require_once '../src/db.php';
 
 $game_id = $_GET['game_id'] ?? '';
 if (!$game_id) { die("Invalid game ID."); }

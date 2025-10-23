@@ -1,7 +1,7 @@
 <?php
-require 'db.php';
+require '../src/db.php';
 session_start();
-require_once 'logger.php'; // << INCLUDE THE LOGGER
+require_once '../src/logger.php'; // << INCLUDE THE LOGGER
 
 $category_id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
 $league_id = filter_var($_GET['league_id'] ?? null, FILTER_VALIDATE_INT);
@@ -63,7 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<?php include 'includes/header.php'; ?>
+<?php include '../src/includes/header.php'; ?>
 <div class="form-container">
     <h1>Edit Category</h1>
 

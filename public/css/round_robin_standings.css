@@ -1,0 +1,79 @@
+/* Styles for Groupings Preview */
+    .groupings-container {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+    }
+    .group-box {
+        background-color: var(--bg-light);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        padding: 1.5rem;
+    }
+    .group-box h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+        font-size: 1.25rem;
+        color: var(--bap-blue);
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 0.75rem;
+    }
+    .group-slots {
+        list-style-type: decimal;
+        padding-left: 1.5rem;
+        margin: 0;
+    }
+    .team-slot {
+        border: 1px dashed transparent;
+        margin-bottom: 0.5rem;
+        border-radius: 4px;
+        transition: border-color 0.2s ease, background-color 0.2s ease;
+    }
+    .team-name {
+        cursor: grab;
+        display: block;
+        padding: 0.6rem 0.8rem;
+        background-color: #f8f9fa;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        transition: background-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .team-name:hover {
+        background-color: #e9ecef;
+    }
+    .team-slot.over {
+        border-color: var(--bap-orange);
+        background-color: #fff3cd;
+    }
+    .team-name.dragging {
+        opacity: 0.5;
+        box-shadow: var(--shadow);
+    }
+    .groups-locked .team-name {
+        cursor: not-allowed;
+    }
+    .groups-locked .team-name:hover {
+        background-color: #f8f9fa;
+    }
+
+    /* Styles for Standings Table */
+    .group-header {
+        font-size: 1.5rem;
+        color: var(--text-dark);
+        margin-top: 2.5rem;
+        margin-bottom: 1rem;
+    }
+    .group-header:first-of-type {
+        margin-top: 0;
+    }
+    .advancing-team td {
+        background-color: #d4edda;
+        font-weight: 600;
+        color: #155724;
+    }
+    /* Adding a visual checkmark for advancing teams */
+    .advancing-team td:first-child::before {
+        margin-right: 8px;
+        color: #155724;
+    }

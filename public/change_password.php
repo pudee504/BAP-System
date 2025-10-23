@@ -7,7 +7,7 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-$pdo = require 'db.php';
+$pdo = require '../src/db.php';
 
 $error = '';
 $success = '';
@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </style>
 </head>
 <body>
-    <?php include 'includes/header.php'; ?>
+    <?php include '../src/includes/header.php'; ?>
 
     <main>
         <div class="main-container">

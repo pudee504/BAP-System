@@ -7,7 +7,7 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-include 'db.php';
+include '../src/db.php';
 
 $user_id = $_SESSION['user_id'];
 $user_role = $_SESSION['role_name']; 
@@ -43,7 +43,7 @@ if (!empty($query)) {
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<?php include 'includes/header.php'; ?>
+<?php include '../src/includes/header.php'; ?>
 
 <div class="dashboard-container">
     

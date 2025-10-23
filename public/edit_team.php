@@ -1,7 +1,7 @@
 <?php
-require 'db.php';
+require '../src/db.php';
 session_start();
-require_once 'logger.php'; 
+require_once '../src/logger.php';
 
 $team_id = filter_input(INPUT_GET, 'team_id', FILTER_VALIDATE_INT);
 if (!$team_id) {
@@ -59,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <?php include 'includes/header.php'; ?>
+    <?php include '../src/includes/header.php'; ?>
     <div class="form-container">
         <h1>Edit Team</h1>
 

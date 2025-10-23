@@ -6,8 +6,8 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['role_name']) || $_SESSION[
     exit();
 }
 
-$pdo = require 'db.php';
-require_once 'logger.php'; 
+$pdo = require '../src/db.php';
+require_once '../src/logger.php';
 
 $error = '';
 $success = '';
@@ -166,7 +166,7 @@ $leagues = $pdo->query("SELECT id, league_name FROM league ORDER BY league_name"
     </style>
 </head>
 <body>
-    <?php include 'includes/header.php'; ?>
+    <?php include '../src/includes/header.php'; ?>
 
     <main>
         <div class="dashboard-container">

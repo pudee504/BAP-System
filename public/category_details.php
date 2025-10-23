@@ -2,7 +2,7 @@
 session_start();
 // FIX 1: Using "require_once" instead of "require" is critical. 
 // It prevents the infinite loop error you were seeing by ensuring this file is only ever included one time.
-require_once 'includes/category_info.php';
+require_once '../src/includes/category_info.php';
 
 // Validate category ID from the URL query string.
 $category_id = $_GET['category_id'] ?? '';
@@ -62,14 +62,14 @@ if ($scheduleGenerated) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($category['category_name']) ?> Details</title>
     
-    <?php include 'includes/head_styles.php'; ?>
+    <?php include '../src/includes/head_styles.php'; ?>
     <link rel="stylesheet" href="style.css"> 
 
     <script src="js/Sortable.min.js"></script>
 </head>
 <body>
 
-<?php include 'includes/header.php'; ?>
+<?php include '../src/includes/header.php'; ?>
 
 <div class="dashboard-container">
     
@@ -89,13 +89,13 @@ if ($scheduleGenerated) {
     </div>
 
     <div class="tab-navigation">
-        <?php include 'includes/category_tabs.php'; ?>
+        <?php include '../src/includes/category_tabs.php'; ?>
     </div>
     
     <div class="tab-container">
-        <?php include 'includes/category_tabs_teams.php'; ?>
-        <?php include 'includes/category_tabs_schedule.php'; ?>
-        <?php include 'includes/category_tabs_standings.php'; ?>
+        <?php include '../src/includes/category_tabs_teams.php'; ?>
+        <?php include '../src/includes/category_tabs_schedule.php'; ?>
+        <?php include '../src/includes/category_tabs_standings.php'; ?>
     </div>
 
 </div>

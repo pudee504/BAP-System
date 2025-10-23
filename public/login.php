@@ -1,7 +1,7 @@
 <?php
 session_start();
-require 'db.php'; // Connect to database using PDO
-require_once 'logger.php'; // Include the logger
+require '../src/db.php'; // Connect to database using PDO
+require_once '../src/logger.php'; // Include the logger
 
 // Only accept POST requests
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
