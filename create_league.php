@@ -4,7 +4,8 @@ include 'db.php';
 require_once 'logger.php'; 
 
 if (!isset($_SESSION['user_id'])) {
-    header("Location: index.php");
+    $_SESSION['error'] = 'Please login first';
+    header('Location: index.php');
     exit;
 }
 

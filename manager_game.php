@@ -11,6 +11,12 @@ require_once 'vendor/autoload.php';
 use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\PngWriter;
 
+if (!isset($_SESSION['user_id'])) {
+    $_SESSION['error'] = 'Please login first';
+    header('Location: index.php');
+    exit;
+}
+
 // --- GAME SETUP ---
 $game_id = $_GET['game_id'] ?? '';
 if (!$game_id) {
@@ -141,7 +147,7 @@ if ($game_id && $current_quarter > 4) {
 <?php include 'includes/header.php'; ?>
 
 <div id="foulPopover">
-    <button class="btn btn-sm btn-primary" onclick="handleFoulSelection('Normal')">Normal Foul</button>
+    <button class="btn btn-sm btn-primary" onclick="handleFoulSelection('Normal')">Foul</button>
     <button class="btn btn-sm btn-secondary" onclick="handleFoulSelection('Offensive')">Offensive Foul</button>
     <button class="btn btn-sm btn-cancel" onclick="cancelFoulSelection()">Cancel</button>
 </div>

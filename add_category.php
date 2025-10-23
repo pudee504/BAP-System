@@ -3,6 +3,12 @@ session_start();
 require 'db.php';
 require_once 'logger.php'; 
 
+if (!isset($_SESSION['user_id'])) {
+    $_SESSION['error'] = 'Please login first';
+    header('Location: index.php');
+    exit;
+}
+
 // --- This block runs when the page is first loaded ---
 if (!isset($_GET['league_id']) || !filter_var($_GET['league_id'], FILTER_VALIDATE_INT, ["options" => ["min_range" => 1]])) {
     // Log this attempt as it could be a sign of tampering or a broken link

@@ -3,6 +3,12 @@ require 'db.php';
 session_start();
 require_once 'logger.php'; 
 
+if (!isset($_SESSION['user_id'])) {
+    $_SESSION['error'] = 'Please login first';
+    header('Location: index.php');
+    exit;
+}
+
 $team_id = filter_var($_GET['team_id'] ?? null, FILTER_VALIDATE_INT);
 if (!$team_id) {
     die("Invalid team.");

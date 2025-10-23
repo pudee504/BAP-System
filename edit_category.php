@@ -3,6 +3,12 @@ require 'db.php';
 session_start();
 require_once 'logger.php'; // << INCLUDE THE LOGGER
 
+if (!isset($_SESSION['user_id'])) {
+    $_SESSION['error'] = 'Please login first';
+    header('Location: index.php');
+    exit;
+}
+
 $category_id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
 $league_id = filter_var($_GET['league_id'] ?? null, FILTER_VALIDATE_INT);
 if (!$category_id || !$league_id) {

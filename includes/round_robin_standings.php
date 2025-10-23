@@ -21,7 +21,7 @@ else:
     $lockStmt->execute([$category_id]);
     $groups_are_locked = $lockStmt->fetchColumn();
     
-    // FIX #1: Modified numberToLetter to handle 0-indexed group numbers (0=A, 1=B).
+    // Use 0-indexed cluster_name for Group A, B, C...
     if (!function_exists('numberToLetter')) {
         function numberToLetter($num) { return chr(65 + (int)$num); }
     }
@@ -50,7 +50,13 @@ else:
     }
 
     // Fetch and organize teams for the preview
-    $groupingStmt = $pdo->prepare("SELECT t.id as team_id, t.team_name, c.cluster_name FROM team t JOIN cluster c ON t.cluster_id = c.id WHERE t.category_id = ? ORDER BY c.cluster_name ASC, t.team_name ASC");
+    $groupingStmt = $pdo->prepare("
+        SELECT t.id as team_id, t.team_name, c.cluster_name 
+        FROM team t 
+        JOIN cluster c ON t.cluster_id = c.id 
+        WHERE t.category_id = ? 
+        ORDER BY c.cluster_name ASC, t.team_name ASC
+    ");
     $groupingStmt->execute([$category_id]);
     $team_groupings_raw = $groupingStmt->fetchAll(PDO::FETCH_ASSOC);
 
@@ -58,6 +64,7 @@ else:
     foreach ($team_groupings_raw as $team) {
         $grouped_teams[$team['cluster_name']][] = $team;
     }
+    ksort($grouped_teams); // Sort groups by cluster_name (0, 1, 2...)
     ?>
 
     <form action="swap_teams.php" method="POST" id="swap-form" style="display: none;">
@@ -92,6 +99,7 @@ else:
             </form>
         <?php else: ?>
             <?php
+            // Check for finished games *before* showing the unlock button
             $gamesPlayedStmt = $pdo->prepare("SELECT COUNT(*) FROM game WHERE category_id = ? AND winnerteam_id IS NOT NULL");
             $gamesPlayedStmt->execute([$category_id]);
             $hasFinishedGames = $gamesPlayedStmt->fetchColumn() > 0;
@@ -116,7 +124,7 @@ else:
     </div>
     
     <?php
-    // --- Display general session messages from other scripts (like create_playoffs.php) ---
+    // --- Display general session messages ---
     if (isset($_SESSION['message'])) {
         $message = $_SESSION['message'];
         $is_error = strpos(strtolower($message), 'error') !== false;
@@ -125,75 +133,66 @@ else:
         unset($_SESSION['message']);
     }
 
-    // STEP 1: Fetch teams with their CLUSTER NAME.
-    $teamsStmt = $pdo->prepare("
-        SELECT t.id, t.team_name, c.cluster_name 
-        FROM team t 
-        JOIN cluster c ON t.cluster_id = c.id 
-        WHERE t.category_id = ? 
-        ORDER BY c.cluster_name ASC, t.team_name ASC
+    // ========================================================================
+    // START: MODIFIED LOGIC
+    // This block replaces the entire on-the-fly calculation
+    // ========================================================================
+
+    // STEP 1: Fetch pre-calculated standings data
+    $standingsStmt = $pdo->prepare("
+        SELECT
+            t.id AS team_id,
+            t.team_name,
+            c.cluster_name,
+            cs.matches_played AS mp,
+            cs.wins AS w,
+            cs.losses AS l,
+            cs.point_scored AS ps,
+            cs.points_allowed AS pa,
+            (cs.point_scored - cs.points_allowed) AS pd
+        FROM
+            cluster_standing AS cs
+        JOIN
+            team AS t ON cs.team_id = t.id
+        JOIN
+            cluster AS c ON cs.cluster_id = c.id
+        WHERE
+            c.category_id = ?
     ");
-    $teamsStmt->execute([$category_id]);
-    $all_teams = $teamsStmt->fetchAll(PDO::FETCH_ASSOC);
+    $standingsStmt->execute([$category_id]);
+    $all_standings_raw = $standingsStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Initialize standings array
-    $standings = [];
-    foreach ($all_teams as $team) {
-        $standings[$team['id']] = [
-            'team_id' => $team['id'], 'team_name' => $team['team_name'], 
-            'cluster_name' => $team['cluster_name'], 
-            'mp' => 0, 'w' => 0, 'l' => 0, 
-            'ps' => 0, 'pa' => 0, 'pd' => 0
-        ];
-    }
-
-    // Fetch and process finished games
-    $gamesStmt = $pdo->prepare("
-        SELECT hometeam_id, awayteam_id, winnerteam_id, hometeam_score, awayteam_score 
-        FROM game 
-        WHERE category_id = ? AND winnerteam_id IS NOT NULL
-    ");
-    $gamesStmt->execute([$category_id]);
-    $finished_games = $gamesStmt->fetchAll(PDO::FETCH_ASSOC);
-
-    $head_to_head = [];
-    foreach ($finished_games as $game) {
-        $home_id = $game['hometeam_id']; $away_id = $game['awayteam_id'];
-        $head_to_head[$home_id][$away_id] = $game['winnerteam_id'];
-        $head_to_head[$away_id][$home_id] = $game['winnerteam_id'];
-
-        if (isset($standings[$home_id]) && isset($standings[$away_id])) {
-            $standings[$home_id]['mp']++; $standings[$away_id]['mp']++;
-            $standings[$home_id]['ps'] += $game['hometeam_score'];
-            $standings[$home_id]['pa'] += $game['awayteam_score'];
-            $standings[$away_id]['ps'] += $game['awayteam_score'];
-            $standings[$away_id]['pa'] += $game['hometeam_score'];
-            if ($game['winnerteam_id'] == $home_id) { $standings[$home_id]['w']++; $standings[$away_id]['l']++; } 
-            else { $standings[$away_id]['w']++; $standings[$home_id]['l']++; }
-        }
-    }
-
-    // STEP 2: Group standings by CLUSTER NAME and calculate point difference
+    // STEP 2: Group standings by CLUSTER NAME
     $grouped_standings = [];
-    foreach ($standings as $team_stats) {
-        $team_stats['pd'] = $team_stats['ps'] - $team_stats['pa'];
+    foreach ($all_standings_raw as $team_stats) {
         $grouped_standings[$team_stats['cluster_name']][] = $team_stats;
     }
+    ksort($grouped_standings); // Sort groups by cluster_name (0, 1, 2...)
 
-    // Sort teams within each group
+
+    // STEP 3: Sort teams within each group based on the pre-calculated data
+    // NOTE: This removes the head-to-head check, as that complex logic
+    // should ideally be handled when populating the table or by a rank column.
+    // For now, we sort by W, then PD, then PS.
     foreach ($grouped_standings as &$group) {
-        usort($group, function($a, $b) use ($head_to_head) {
-            if ($b['w'] !== $a['w']) { return $b['w'] <=> $a['w']; }
-            $team_a_id = $a['team_id']; $team_b_id = $b['team_id'];
-            if (isset($head_to_head[$team_a_id][$team_b_id])) {
-                $winner_id = $head_to_head[$team_a_id][$team_b_id];
-                if ($winner_id == $team_a_id) return -1;
-                if ($winner_id == $team_b_id) return 1;
+        usort($group, function($a, $b) {
+            // 1. Sort by Wins (descending)
+            if ($b['w'] !== $a['w']) {
+                return $b['w'] <=> $a['w'];
             }
-            return $b['pd'] <=> $a['pd'];
+            // 2. Sort by Point Differential (descending)
+            if ($b['pd'] !== $a['pd']) {
+                return $b['pd'] <=> $a['pd'];
+            }
+            // 3. Sort by Points Scored (descending) as a final tie-breaker
+            return $b['ps'] <=> $a['ps'];
         });
     }
-    unset($group);
+    unset($group); // Unset the reference
+
+    // ========================================================================
+    // END: MODIFIED LOGIC
+    // ========================================================================
     ?>
 
     <?php if (!empty($grouped_standings)): ?>
@@ -222,35 +221,55 @@ else:
             </div>
         <?php endforeach; ?>
     <?php else: ?>
-        <p class="info-message">No teams were found for this category to generate standings.</p>
+        <p class="info-message">No standings data found. Ensure games have been played and finalized to populate the standings.</p>
     <?php endif; ?>
 
     <?php
     // --- ACTION BUTTONS SECTION ---
-    $totalGamesStmt = $pdo->prepare("SELECT COUNT(*) FROM game WHERE category_id = ?");
+    $totalGamesStmt = $pdo->prepare("SELECT COUNT(*) FROM game WHERE category_id = ? AND stage = 'Group Stage'");
     $totalGamesStmt->execute([$category_id]);
     $total_games = $totalGamesStmt->fetchColumn();
 
-    $finishedGamesStmt = $pdo->prepare("SELECT COUNT(*) FROM game WHERE category_id = ? AND winnerteam_id IS NOT NULL");
+    $finishedGamesStmt = $pdo->prepare("SELECT COUNT(*) FROM game WHERE category_id = ? AND winnerteam_id IS NOT NULL AND stage = 'Group Stage'");
     $finishedGamesStmt->execute([$category_id]);
     $finished_games_count = $finishedGamesStmt->fetchColumn();
-    $hasFinishedGames = $finished_games_count > 0;
+    
     $allGamesAreFinished = ($total_games > 0 && $total_games === $finished_games_count);
+
+    // === START: NEW CODE TO CHECK FOR EXISTING PLAYOFFS ===
+    $playoffCheckStmt = $pdo->prepare("SELECT playoff_category_id FROM category WHERE id = ?");
+    $playoffCheckStmt->execute([$category_id]);
+    $playoff_category_id = $playoffCheckStmt->fetchColumn();
+    // === END: NEW CODE ===
     ?>
 
     <div class="form-actions" style="text-align: left; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
-        <?php if ($allGamesAreFinished): ?>
+        
+        <?php if ($allGamesAreFinished && empty($playoff_category_id)): ?>
             <form action="create_playoffs.php" method="POST" onsubmit="return confirm('This will create a new Single Elimination category with the advancing teams. Are you sure you want to proceed?');">
                 <input type="hidden" name="category_id" value="<?= $category_id ?>">
                 <button type="submit" class="btn btn-primary">Proceed to Playoffs</button>
             </form>
-        <?php elseif ($groups_are_locked && !$hasFinishedGames): ?>
+
+        <?php elseif ($allGamesAreFinished && !empty($playoff_category_id)): ?>
+            <button type="button" class="btn btn-primary" disabled>Playoffs Already Created</button>
+            <p style="margin-top: 0.5rem;">
+                <a href="category_details.php?category_id=<?= htmlspecialchars($playoff_category_id) ?>&tab=schedule" style="font-weight: bold;">
+                    View Playoffs &rarr;
+                </a>
+            </p>
+
+        <?php elseif ($groups_are_locked && $finished_games_count > 0): ?>
+            <p class="info-message">Finish all group stage games to proceed to the playoffs.</p>
+
+        <?php elseif ($groups_are_locked && $finished_games_count === 0): ?>
             <form action="toggle_group_lock.php" method="POST" onsubmit="return confirm('WARNING: Unlocking the groups will delete the entire generated schedule and any match data. Are you sure you want to proceed?');">
                 <input type="hidden" name="category_id" value="<?= $category_id ?>">
                 <input type="hidden" name="lock_status" value="0">
                 <button type="submit" class="btn btn-danger">Unlock Groups & Clear Schedule</button>
             </form>
         <?php endif; ?>
+
     </div>
 
     <?php endif; /* End of schedule generated check */ ?>
@@ -375,4 +394,3 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 });
 </script>
-

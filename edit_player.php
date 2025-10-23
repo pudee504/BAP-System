@@ -3,6 +3,12 @@ require 'db.php';
 session_start();
 require_once 'logger.php'; 
 
+if (!isset($_SESSION['user_id'])) {
+    $_SESSION['error'] = 'Please login first';
+    header('Location: index.php');
+    exit;
+}
+
 $id = (int) ($_GET['id'] ?? 0);
 $team_id = (int) ($_GET['team_id'] ?? 0);
 

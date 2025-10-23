@@ -3,6 +3,12 @@ require 'db.php';
 session_start();
 require_once 'logger.php'; // << INCLUDE THE LOGGER
 
+if (!isset($_SESSION['user_id'])) {
+    $_SESSION['error'] = 'Please login first';
+    header('Location: index.php');
+    exit;
+}
+
 $league_id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
 if (!$league_id) {
     log_action('EDIT_LEAGUE', 'FAILURE', 'Attempted to access edit page with an invalid league ID.');

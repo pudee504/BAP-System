@@ -4,6 +4,12 @@ session_start();
 // It prevents the infinite loop error you were seeing by ensuring this file is only ever included one time.
 require_once 'includes/category_info.php';
 
+if (!isset($_SESSION['user_id'])) {
+    $_SESSION['error'] = 'Please login first';
+    header('Location: index.php');
+    exit;
+}
+
 // Validate category ID from the URL query string.
 $category_id = $_GET['category_id'] ?? '';
 if (!$category_id) {
