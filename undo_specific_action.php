@@ -55,14 +55,16 @@ try {
             $stmt->execute([$game_id, $team_id, $timeout_period]);
             break;
 
-        // ... (rest of your cases for FOUL, 1PM, etc. are correct and remain unchanged)
+        // This case now handles "Normal Fouls"
         case 'FOUL':
+            // 1. Undo Team Foul
             $stmt = $pdo->prepare(
                 "UPDATE game_team_fouls SET fouls = GREATEST(0, fouls - 1) 
                  WHERE game_id = ? AND team_id = ? AND quarter = ?"
             );
             $stmt->execute([$game_id, $team_id, $quarter]);
 
+            // 2. Undo Player Foul
             $foul_stat_id = getStatisticId($pdo, 'FOUL');
             if ($foul_stat_id && $player_id) {
                 $stmt = $pdo->prepare(
@@ -71,6 +73,20 @@ try {
                 );
                 $stmt->execute([$game_id, $player_id, $team_id, $foul_stat_id]);
             }
+            break;
+            
+        // **NEW CASE**
+        case 'FOUL_OFFENSIVE':
+            // 1. Undo Player Foul ONLY
+            $foul_stat_id = getStatisticId($pdo, 'FOUL');
+            if ($foul_stat_id && $player_id) {
+                $stmt = $pdo->prepare(
+                    "INSERT INTO game_statistic (game_id, player_id, team_id, statistic_id, value)
+                     VALUES (?, ?, ?, ?, -1) ON DUPLICATE KEY UPDATE value = value - 1"
+                );
+                $stmt->execute([$game_id, $player_id, $team_id, $foul_stat_id]);
+            }
+            // NO update to game_team_fouls
             break;
             
         case '1PM':

@@ -229,9 +229,9 @@ if (!$game) die("Game not found.");
                 document.getElementById('foulsA').textContent = homeFouls;
                 document.getElementById('foulsB').textContent = awayFouls;
 
-                document.getElementById('bonus-teamA').classList.toggle('visible', awayFouls >= 4);
+                document.getElementById('bonus-teamA').classList.toggle('visible', awayFouls >= 5);
 // CORRECTED LOGIC: Team B is in bonus if Team A commits enough fouls
-document.getElementById('bonus-teamB').classList.toggle('visible', homeFouls >= 4);
+document.getElementById('bonus-teamB').classList.toggle('visible', homeFouls >= 5);
                 
                 updateDisplay();
 

@@ -4,6 +4,11 @@ session_start();
 require_once 'logger.php'; // << INCLUDE THE LOGGER
 
 $league_id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
+if ($_SESSION['role_name'] !== 'Admin') {
+    log_action('DELETE_LEAGUE', 'FAILURE', 'Non-admin user attempted to delete a league.');
+    die("You are not authorized to delete leagues.");
+}
+
 if (!$league_id) {
     log_action('DELETE_LEAGUE', 'FAILURE', 'Attempted to delete a league with an invalid ID.');
     die("Invalid league ID.");

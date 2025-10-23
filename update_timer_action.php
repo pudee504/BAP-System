@@ -26,7 +26,8 @@ try {
         exit;
     }
     
-    // Use the time from the remote control as the source of truth for the clock value
+    // **FIX**: Restore this block to trust the client's clock on every action.
+    // This is what makes the local countdown work with possession/adjust buttons.
     if (isset($input['game_clock'])) {
         $timer['game_clock'] = (int)$input['game_clock'];
     }
@@ -35,9 +36,12 @@ try {
     }
 
     $overtime_duration = 300 * 1000; // 5 minutes
+    $regular_duration = 600 * 1000; // 10 minutes
+    $default_shot_clock = 24000; // 24 seconds
 
     switch ($action) {
         case 'toggle':
+            // This is the original, simple toggle logic.
             if ($timer['game_clock'] > 0) {
                 $timer['running'] = !$timer['running'];
             } else {
@@ -61,10 +65,24 @@ try {
             $timer['shot_clock'] = min($timer['game_clock'], $maxShot);
             break;
         case 'nextQuarter':
-            $timer['quarter_id']++;
-            $timer['game_clock'] = $timer['quarter_id'] <= 4 ? (600 * 1000) : $overtime_duration;
-            $timer['shot_clock'] = min($timer['game_clock'], 24000);
-            $timer['running'] = false;
+             // Can only proceed if clock is NOT running
+            if (!$timer['running']) {
+                $timer['quarter_id']++;
+                $timer['game_clock'] = $timer['quarter_id'] <= 4 ? $regular_duration : $overtime_duration;
+                $timer['shot_clock'] = min($timer['game_clock'], $default_shot_clock);
+                $timer['running'] = false; // Ensure remains paused
+            }
+            break;
+
+        // **NEW CASE (As requested)**
+        case 'prevQuarter':
+             // Can only go back if clock is NOT running and not in Q1
+             if (!$timer['running'] && $timer['quarter_id'] > 1) {
+                $timer['quarter_id']--;
+                $timer['game_clock'] = 0; // Set clock to 0 as requested
+                $timer['shot_clock'] = 0; // Set clock to 0 as requested
+                $timer['running'] = false; // Ensure remains paused
+             }
             break;
     }
 
@@ -79,7 +97,7 @@ try {
         (int)$timer['shot_clock'], 
         (int)$timer['quarter_id'], 
         (int)$timer['running'], 
-        $currentTimeMs, // ** THE FIX **: Save the timestamp with every action
+        $currentTimeMs, // Save the timestamp with every action
         $game_id
     ]);
     

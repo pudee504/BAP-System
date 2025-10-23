@@ -21,8 +21,9 @@
     color: var(--text-light);
     padding: 0.5rem 1.5rem;
     border-radius: 12px;
-    margin-bottom: 1.5rem;
+    /* REMOVED margin-bottom: 1.5rem; */
     box-shadow: 0 4px 15px rgba(31, 37, 147, 0.3);
+    /* REMOVED position: relative; */
 }
 
 .team-info {
@@ -79,9 +80,9 @@
 /* --- Teams Container & Tables --- */
 .teams-container {
     display: grid;
-    /* This creates the two-column layout for the tables */
     grid-template-columns: 1fr 1fr;
     gap: 2rem;
+    margin-top: 1.5rem; /* Added margin-top to separate from indicator */
 }
 
 /* On smaller screens, stack the tables vertically */
@@ -130,23 +131,20 @@
 }
 
 .table-wrapper {
-    max-height: 65vh; /* Sets a maximum height (e.g., 45% of the viewport height) */
-    overflow-y: auto; /* Adds a vertical scrollbar only when needed */
-    position: relative; /* Establishes a positioning context for the sticky header */
+    max-height: 65vh; 
+    overflow-y: auto; 
+    position: relative; 
 }
 
-/* Step 2: Make the table headers sticky */
 .category-table thead th {
-    position: sticky; /* The magic property */
-    top: 0; /* Sticks the header to the top of the .table-wrapper */
-    z-index: 2; /* Ensures the header stays above the scrolling rows */
-
-    /* This is important to prevent scrolling rows from showing through the header */
+    position: sticky; 
+    top: 0; 
+    z-index: 2; 
     background-color: #f8f9fa; 
 }
 
 .team-box table {
-    font-size: 0.70rem; /* Slightly reduced from 0.875rem for more space */
+    font-size: 0.70rem; 
     table-layout: fixed;
     width: 100%;
 }
@@ -161,7 +159,7 @@
 
 /* Column width adjustments */
 .team-box table th:nth-child(1), .team-box table td:nth-child(1) { width: 35px; } /* In */
-.team-box table th:nth-child(2), .team-box table td:nth-child(2) { width: 70px; } /* # - Changed from 70px */
+.team-box table th:nth-child(2), .team-box table td:nth-child(2) { width: 70px; } /* # */
 .team-box table th:nth-child(3), .team-box table td:nth-child(3) { width: auto; } /* Name */
 .team-box table th:nth-child(n+4):nth-child(-n+12) { width: 37px; } /* Stats */
 .team-box table th:nth-child(13), .team-box table td:nth-child(13) { width: 30px; } /* PTS */
@@ -213,7 +211,7 @@ tr:has(.in-game-checkbox:checked) .name-cell {
 .stat-controls {
     position: absolute;
     top: 0; left: 0; right: 0; bottom: 0;
-    display: none; /* Changed from display:flex to none initially */
+    display: none; 
     align-items: center;
     justify-content: center;
     background-color: rgba(233, 245, 255, 0.85);
@@ -222,7 +220,7 @@ tr:has(.in-game-checkbox:checked) .name-cell {
     transition: opacity 0.2s ease, visibility 0.2s ease;
 }
 .stat-cell:hover .stat-controls {
-    display: flex; /* Display on hover */
+    display: flex; 
     opacity: 1;
     visibility: visible;
 }
@@ -330,4 +328,61 @@ tr:has(.in-game-checkbox:checked) .name-cell {
 }
 .container-message a {
     color: var(--bap-orange);
+}
+
+
+/* ========================================================================== 
+   NEW STYLES (MOVED FROM MANAGE_GAME.PHP & MODIFIED)
+========================================================================== 
+*/
+
+/* --- Foul Popover --- */
+#foulPopover {
+    display: none;
+    position: absolute;
+    z-index: 1050;
+    width: 150px;
+    background-color: #ffffff;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    box-shadow: 0 5px 15px rgba(0,0,0,.15);
+    padding: 10px;
+}
+#foulPopover .btn {
+    display: block;
+    width: 100%;
+    margin-bottom: 5px;
+    text-align: center;
+}
+#foulPopover .btn-cancel {
+    margin-top: 8px;
+    margin-bottom: 0;
+    background-color: #f0f0f0;
+}
+
+/* --- Quarter Indicator (Below Score Display) --- */
+.quarter-indicator {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.75rem; /* Space between Quarter and Clock */
+    background-color: #f8f9fa; /* Light background */
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    margin-top: 0.5rem; /* Space below score display */
+    margin-bottom: 1rem; /* Space above team tables */
+    font-size: 1.3rem; /* Adjusted size */
+    font-weight: 600;
+    color: var(--text-dark);
+}
+
+.quarter-indicator .indicator-separator {
+    color: #ccc; /* Light gray separator */
+}
+
+.quarter-indicator .indicator-clock {
+    font-family: 'Courier New', Courier, monospace;
+    font-weight: bold;
+    color: var(--bap-blue); /* Blue clock text */
 }

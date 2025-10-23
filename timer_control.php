@@ -97,7 +97,7 @@ if (!$game_id) { die("Invalid game ID."); }
             margin: 0.25rem;
         }
 
-        button:hover {
+        button:hover:not(:disabled) { /* Don't apply hover effects to disabled buttons */
             transform: translateY(-2px);
             box-shadow: 0 4px 8px rgba(0,0,0,0.15);
         }
@@ -132,6 +132,12 @@ if (!$game_id) { die("Invalid game ID."); }
             background-color: var(--bap-orange);
             color: var(--text-dark);
             width: 90%;
+        }
+
+        /* Style for Previous Quarter button */
+        #prevQuarterBtn {
+            background-color: #6c757d; /* Gray color */
+             color: var(--text-light);
         }
 
         /* ==========================================================================
@@ -187,6 +193,7 @@ if (!$game_id) { die("Invalid game ID."); }
         </div>
         <div class="control-group">
             <h4>Game Flow</h4>
+            <button id="prevQuarterBtn" onclick="sendAction('prevQuarter')" disabled>Previous Quarter</button>
             <button id="nextQuarterBtn" onclick="sendAction('nextQuarter')">Next Quarter</button>
             <button id="finalizeGameBtn" onclick="finalizeGame()" style="display:none;">Finalize Game</button>
         </div>
@@ -198,8 +205,7 @@ if (!$game_id) { die("Invalid game ID."); }
         let isClockRunning = false;
         let gameClockMs = 0;
         let shotClockMs = 0;
-
-        // NEW: State variable to track if the shot clock is "held" after a reset
+        let currentQuarterId = 1; // Keep track of quarter locally
         let shotClockHeld = false;
 
         function formatGameTime(ms) {
@@ -224,6 +230,7 @@ if (!$game_id) { die("Invalid game ID."); }
         }
 
         function updateUI(state) {
+            currentQuarterId = state.quarter_id;
             gameClockMs = state.game_clock;
             shotClockMs = state.shot_clock;
             updateDisplay();
@@ -234,58 +241,62 @@ if (!$game_id) { die("Invalid game ID."); }
             const toggleBtn = document.getElementById('toggleClockBtn');
             toggleBtn.textContent = state.running ? 'Pause' : 'Start';
             toggleBtn.classList.toggle('running', state.running);
-            isClockRunning = state.running;
+            isClockRunning = state.running; // This is the most important update
 
-            // MODIFIED: If the server reports the clock is stopped, we must cancel any local hold.
             if (!isClockRunning) {
                 shotClockHeld = false;
             }
             
+            const prevBtn = document.getElementById('prevQuarterBtn');
             const nextBtn = document.getElementById('nextQuarterBtn');
             const finalizeBtn = document.getElementById('finalizeGameBtn');
-            const isTied = state.hometeam_score === state.awayteam_score;
             
-            if (state.game_clock <= 0) {
+            // Check for a tied score
+            const isTied = (state.hometeam_score === state.awayteam_score);
+            
+            prevBtn.disabled = (state.quarter_id <= 1 || state.running); 
+
+            if (state.game_clock <= 0 && !state.running) { 
                 if (state.quarter_id >= 4 && !isTied) {
                     finalizeBtn.style.display = 'inline-block';
                     nextBtn.disabled = true;
                 } else {
                     finalizeBtn.style.display = 'none';
-                    nextBtn.disabled = false;
+                    nextBtn.disabled = false; 
                 }
                 nextBtn.textContent = (state.quarter_id >= 4 && isTied) ? 'Start Overtime' : 'Next Quarter';
             } else {
-                nextBtn.disabled = true;
+                nextBtn.disabled = true; 
                 finalizeBtn.style.display = 'none';
+            }
+             
+            if(state.running){
+                 finalizeBtn.style.display = 'none';
             }
         }
 
-        // NEW: This function implements the two-click logic for possession changes.
         function handlePossessionReset(isOffensive) {
-            // If the game clock isn't running, the two-click system isn't needed. Reset immediately.
             if (!isClockRunning) {
                 shotClockHeld = false; 
                 sendAction('resetShotClock', { isOffensive });
                 return;
             }
 
-            // If the clock IS running, this implements the "hold" logic.
             if (!shotClockHeld) {
-                // FIRST CLICK: Set the hold flag and send the reset command.
-                // The local timer will now be prevented from running the shot clock down.
                 shotClockHeld = true;
                 sendAction('resetShotClock', { isOffensive });
             } else {
-                // SECOND CLICK (or an override click on the other button):
-                // Release the hold and send the reset command again. This ensures the
-                // shot clock starts from its full value (24/14).
                 shotClockHeld = false;
                 sendAction('resetShotClock', { isOffensive });
             }
         }
 
         async function sendAction(action, payload = {}) {
-            // Any action that isn't a possession reset should cancel the hold state.
+            if ((action === 'nextQuarter' || action === 'prevQuarter') && isClockRunning) {
+                alert("Please pause the clock before changing quarters.");
+                return;
+            }
+            
             if (action !== 'resetShotClock') {
                 shotClockHeld = false;
             }
@@ -296,6 +307,7 @@ if (!$game_id) { die("Invalid game ID."); }
                     action: action, 
                     game_clock: gameClockMs, 
                     shot_clock: shotClockMs,
+                    current_quarter: currentQuarterId, 
                     ...payload 
                 };
 
@@ -307,6 +319,13 @@ if (!$game_id) { die("Invalid game ID."); }
                 const result = await response.json();
                 if (result.success) {
                     updateUI(result.newState);
+                    
+                    // **THE FIX IS HERE:**
+                    // This function will now be called after the state is updated.
+                    // It will check the new `isClockRunning` value and start/stop the
+                    // local timer interval.
+                    runLocalTimer(); 
+
                 } else {
                     alert('Error: ' + result.error);
                 }
@@ -317,10 +336,20 @@ if (!$game_id) { die("Invalid game ID."); }
         
         async function fetchLatestTimerState() {
              try {
-                const response = await fetch(`get_timer_state.php?game_id=${gameId}`);
+                const response = await fetch(`get_timer_state.php?game_id=${gameId}&t=${new Date().getTime()}`); 
                 const state = await response.json();
-                if (state && !isClockRunning) {
+                
+                if (state && (!isClockRunning || !state.running)) { 
                     updateUI(state);
+                    // **NEW**: Also call runLocalTimer here to stop any running intervals
+                    // if the clock was paused from another device.
+                    runLocalTimer();
+                } else if (state) {
+                    currentQuarterId = state.quarter_id;
+                     document.getElementById('quarterLabel').textContent = state.quarter_id <= 4 ? 
+                        ['1st', '2nd', '3rd', '4th'][state.quarter_id - 1] + ' Quarter' : `Overtime ${state.quarter_id - 4}`;
+                     const prevBtn = document.getElementById('prevQuarterBtn'); 
+                     prevBtn.disabled = (state.quarter_id <= 1 || state.running); 
                 }
              } catch (error) {
                 console.error('Failed to fetch timer state:', error);
@@ -331,21 +360,19 @@ if (!$game_id) { die("Invalid game ID."); }
             if (!confirm("Are you sure you want to finalize this game? This will set the winner based on the current score and end the game.")) {
                 return;
             }
-
             try {
                 const response = await fetch('finalize_game.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ game_id: gameId })
                 });
-
                 const result = await response.json();
-
                 if (result.success) {
                     alert('Game has been finalized successfully! The winner will now be displayed on the management page.');
                     document.querySelectorAll('button').forEach(btn => btn.disabled = true);
                     document.getElementById('toggleClockBtn').textContent = 'Game Over';
                     document.getElementById('toggleClockBtn').classList.remove('running');
+                    if(localTimerInterval) clearInterval(localTimerInterval); 
                 } else {
                     alert('Error finalizing game: ' + (result.error || 'Unknown error'));
                 }
@@ -356,30 +383,40 @@ if (!$game_id) { die("Invalid game ID."); }
         }
         
         function runLocalTimer() {
+            // First, always clear any existing timer.
             if (localTimerInterval) clearInterval(localTimerInterval);
-            localTimerInterval = setInterval(() => {
-                if (isClockRunning) {
-                    gameClockMs = Math.max(0, gameClockMs - 100);
-                    
-                    // MODIFIED: Only decrement the shot clock if it is NOT being held.
-                    if (!shotClockHeld) {
-                        shotClockMs = Math.max(0, shotClockMs - 100);
+            
+            // Only start a new timer if the clock is supposed to be running.
+            if (isClockRunning) { 
+                localTimerInterval = setInterval(() => {
+                    if (isClockRunning) { 
+                        gameClockMs = Math.max(0, gameClockMs - 100);
+                        
+                        if (!shotClockHeld) {
+                            shotClockMs = Math.max(0, shotClockMs - 100);
+                        }
+                        
+                        updateDisplay();
+                        if (gameClockMs === 0) {
+                            isClockRunning = false; 
+                            clearInterval(localTimerInterval);
+                            sendAction('toggle'); 
+                        }
+                    } else {
+                         clearInterval(localTimerInterval); 
                     }
-                    
-                    updateDisplay();
-                    if (gameClockMs === 0 && isClockRunning) {
-    // Stop the local clock and, most importantly, tell the server.
-    isClockRunning = false; 
-    sendAction('toggle'); // This tells the server to stop the clock and syncs the time to 0.
-}
-                }
-            }, 100);
+                }, 100);
+             }
         }
 
         document.addEventListener('DOMContentLoaded', () => {
-            fetchLatestTimerState();
-            runLocalTimer();
-            setInterval(fetchLatestTimerState, 5000);
+            // Fetch the initial state AND THEN start the local timer logic.
+            fetchLatestTimerState().then(() => {
+                 runLocalTimer(); 
+            }); 
+           
+            // Continue polling for external changes
+            setInterval(fetchLatestTimerState, 5000); 
         });
     </script>
 </body>
