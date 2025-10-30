@@ -1,18 +1,23 @@
 <?php
-// This file is included in 'category_tabs_standings.php'.
+// FILENAME: includes/double_elim_visualizer.php
+// DESCRIPTION: Renders the double-elimination tournament bracket.
 
-// --- HELPER FUNCTIONS ---
-require_once 'includes/double_elim_logic.php'; // Use the shared logic file
+// Include the shared logic functions for bracket generation and round naming.
+require_once 'includes/double_elim_logic.php';
 
 // =================================================================================================
 // --- SETUP MODE ---
+// (Displayed before the bracket is locked and schedule is generated)
 // =================================================================================================
 if (!$scheduleGenerated):
 ?>
     <?php
-    // This block initializes bracket positions if they don't exist.
+    // --- 1. INITIALIZE BRACKET POSITIONS ---
+    // Check if positions are already set for this category.
     $checkPosStmt = $pdo->prepare("SELECT COUNT(*) FROM bracket_positions WHERE category_id = ?");
     $checkPosStmt->execute([$category_id]);
+    
+    // If no positions exist, create them based on an alphabetical sort of teams.
     if ($checkPosStmt->fetchColumn() == 0) {
         $teams_stmt = $pdo->prepare("SELECT id FROM team WHERE category_id = ? ORDER BY team_name ASC");
         $teams_stmt->execute([$category_id]);
@@ -22,23 +27,27 @@ if (!$scheduleGenerated):
         foreach ($initial_teams as $team_id) { $insertPosStmt->execute([$category_id, $pos, $pos, $team_id]); $pos++; }
     }
     
-    // Fetch teams by their bracket position for display.
+    // --- 2. FETCH TEAMS ---
+    // Fetch all teams for this category, ordered by their current draggable position.
     $teams_query = $pdo->prepare("SELECT bp.position, bp.seed, bp.team_id, t.team_name FROM bracket_positions bp JOIN team t ON bp.team_id = t.id WHERE bp.category_id = ? ORDER BY bp.position ASC");
     $teams_query->execute([$category_id]);
     $results = $teams_query->fetchAll(PDO::FETCH_ASSOC);
     
+    // Map teams by their position for easy lookup.
     $teams_by_position = [];
     foreach ($results as $row) { 
         $teams_by_position[$row['position']] = ['id' => $row['team_id'], 'name' => $row['team_name'], 'pos' => $row['position'], 'seed' => $row['seed']]; 
     }
     $num_teams = count($teams_by_position);
 
+    // Double elimination requires at least 3 teams.
     if ($num_teams < 3) {
         echo "<div class='warning-message'>Double elimination requires at least 3 teams.</div>";
         return;
     }
     
-    // Generate the bracket structure in memory for preview.
+    // --- 3. GENERATE PREVIEW BRACKET ---
+    // Use the logic file to generate the complete bracket structure in memory.
     $bracket_size = 2 ** ceil(log($num_teams, 2));
     $bracket_data = generate_double_elimination_matches($teams_by_position);
     if (!$bracket_data) { echo "Failed to generate bracket data."; return; }
@@ -49,6 +58,7 @@ if (!$scheduleGenerated):
     ?>
     
     <p class="info-message" style="text-align: left; padding: 0 0 1.5rem 0;">Drag and drop any team to swap its initial position.</p>
+    
     <div class="tournament-wrapper">
         <div class="bracket-area">
             <div class="bracket-header">Winners Bracket</div>
@@ -57,7 +67,8 @@ if (!$scheduleGenerated):
                     <div class="bracket-round">
                         <h4 class="bracket-round-title"><?= getRoundName($bracket_size, 'winner', $r) ?></h4>
                         <?php foreach ($round_matches as $match_index => $match): ?>
-                            <?php if ($match_index > 0) {
+                            <?php // Add spacers for vertical alignment
+                            if ($match_index > 0) {
                                 $num_spacers = (2 ** ($r - 1)) - 1;
                                 for ($s = 0; $s < $num_spacers; $s++) echo '<div class="bracket-spacer"></div>';
                             } ?>
@@ -87,7 +98,8 @@ if (!$scheduleGenerated):
                     <div class="bracket-round">
                         <h4 class="bracket-round-title"><?= getRoundName($bracket_size, 'loser', $lr) ?></h4>
                         <?php foreach ($round_matches as $match_index => $match): ?>
-                            <?php if ($match_index > 0) echo '<div class="bracket-spacer-simple"></div>'; ?>
+                            <?php // Add simple spacers for vertical alignment in losers bracket
+                            if ($match_index > 0) echo '<div class="bracket-spacer-simple"></div>'; ?>
                             <div class="bracket-match">
                                 <div class="match-number"><?= htmlspecialchars($match['match_number']) ?></div>
                                 <div class="bracket-teams">
@@ -123,10 +135,12 @@ if (!$scheduleGenerated):
 else:
 // =================================================================================================
 // --- LIVE MODE ---
+// (Displayed after the bracket is locked and schedule is generated)
 // =================================================================================================
 ?>
     <?php
-    // Fetch all games from the database for the live bracket.
+    // --- 1. FETCH ALL GAME DATA ---
+    // Get all games from the database, sorting by bracket type and round.
     $all_games_query = $pdo->prepare("
         SELECT g.id, g.round, g.round_name, g.bracket_type, g.hometeam_id, g.awayteam_id, g.winnerteam_id, g.hometeam_score, g.awayteam_score, g.game_status, g.winner_advances_to_game_id, g.winner_advances_to_slot, g.loser_advances_to_game_id, g.loser_advances_to_slot, ht.team_name as hometeam_name, awt.team_name as awayteam_name, bph.seed as hometeam_seed, bpa.seed as awayteam_seed
         FROM game g 
@@ -138,14 +152,15 @@ else:
     $all_games_query->execute([$category_id]);
     $all_games_flat = $all_games_query->fetchAll(PDO::FETCH_ASSOC);
 
-    // Unified "Match X" numbering for ALL games, including Grand Final.
+    // --- 2. CREATE LOOKUP MAPS ---
+    // Create a unified "Match X" number for all games in the tournament.
     $matchNumberMap = [];
-    $match_num = 1; // Single counter for all matches.
+    $match_num = 1;
     foreach ($all_games_flat as $game) {
         $matchNumberMap[$game['id']] = 'Match ' . $match_num++;
     }
 
-    // Build a map to determine placeholder text (e.g., "Winner of Match 1").
+    // Build a map to show placeholder text (e.g., "Winner of Match 1" or "Loser of Match 2").
     $feederMap = [];
     foreach ($all_games_flat as $game) {
         $source_match_label = $matchNumberMap[$game['id']] ?? 'Match';
@@ -157,7 +172,8 @@ else:
         }
     }
     
-    // Group games by bracket and round for rendering.
+    // --- 3. ORGANIZE GAMES FOR DISPLAY ---
+    // Group all fetched games by their bracket and round name.
     $winners_games = [];
     $losers_games = [];
     $grand_final_games = [];
@@ -174,9 +190,10 @@ else:
                 break;
         }
     }
-    ksort($grand_final_games);
+    ksort($grand_final_games); // Ensure Grand Final rounds are in order (in case of bracket reset).
 
-    // Reusable function to render a single match in live mode.
+    // --- 4. REUSABLE RENDER FUNCTION ---
+    // Helper function to render a single live match box with scores and placeholders.
     if (!function_exists('render_live_match')) {
         function render_live_match($match, $matchNumberMap, $feederMap) {
             echo '<div class="bracket-match">';
@@ -187,6 +204,7 @@ else:
             if ($match['hometeam_name']) {
                 echo '<span class="seed">(' . htmlspecialchars($match['hometeam_seed']) . ')</span><span class="team-name">' . htmlspecialchars($match['hometeam_name']) . '</span><span class="score">' . (($match['game_status'] == 'Final') ? $match['hometeam_score'] : '') . '</span>';
             } else {
+                // Show placeholder if team isn't known yet.
                 $placeholder = 'TBD';
                 if (isset($feederMap[$match['id']]['home'])) { $feed = $feederMap[$match['id']]['home']; $placeholder = $feed['type'] . ' ' . $feed['label']; }
                 echo '<span class="team-name placeholder">' . $placeholder . '</span>';
@@ -197,6 +215,7 @@ else:
             if ($match['awayteam_name']) {
                 echo '<span class="seed">(' . htmlspecialchars($match['awayteam_seed']) . ')</span><span class="team-name">' . htmlspecialchars($match['awayteam_name']) . '</span><span class="score">' . (($match['game_status'] == 'Final') ? $match['awayteam_score'] : '') . '</span>';
             } else {
+                // Show placeholder if team isn't known yet.
                 $placeholder = 'TBD';
                 if (isset($feederMap[$match['id']]['away'])) { $feed = $feederMap[$match['id']]['away']; $placeholder = $feed['type'] . ' ' . $feed['label']; }
                 echo '<span class="team-name placeholder">' . $placeholder . '</span>';
@@ -206,7 +225,7 @@ else:
     }
     ?>
     <div class="tournament-wrapper">
-         <div class="bracket-area">
+        <div class="bracket-area">
             <div class="bracket-header">Winners Bracket</div>
             <div class="bracket-body">
                 <?php 
@@ -215,7 +234,8 @@ else:
                     <div class="bracket-round">
                         <h4 class="bracket-round-title"><?= htmlspecialchars($round_name) ?></h4>
                         <?php foreach ($round_matches as $match_index => $match): ?>
-                            <?php if ($match_index > 0) {
+                            <?php // Add spacers for vertical alignment
+                            if ($match_index > 0) {
                                 $spacers = (2 ** ($round_num - 1)) - 1;
                                 for ($s=0; $s<$spacers; $s++) echo '<div class="bracket-spacer"></div>';
                             } ?>
@@ -225,6 +245,7 @@ else:
                 <?php $round_num++; endforeach; ?>
             </div>
         </div>
+        
         <div class="bracket-area">
             <div class="bracket-header">Losers Bracket</div>
             <div class="bracket-body">
@@ -239,6 +260,7 @@ else:
                 <?php endforeach; ?>
             </div>
         </div>
+        
         <div class="bracket-area">
             <div class="bracket-header">Grand Final</div>
             <div class="bracket-body">
@@ -294,16 +316,21 @@ document.addEventListener('DOMContentLoaded', () => {
             e.dataTransfer.effectAllowed = 'move';
             target.style.opacity = '0.5';
         });
+
         elem.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; });
+
         elem.addEventListener('drop', (e) => {
             e.preventDefault();
             const dropTarget = e.target.closest('.bracket-team.draggable');
+            // Ensure drop is on a valid, different draggable target.
             if (!dropTarget || !dropTarget.dataset.positionId || dropTarget === draggedElement) {
                 if (draggedElement) draggedElement.style.opacity = '1'; return;
             }
             const sourcePosId = draggedElement.dataset.positionId;
             const targetPosId = dropTarget.dataset.positionId;
             if (!sourcePosId || !targetPosId) { if (draggedElement) draggedElement.style.opacity = '1'; return; }
+            
+            // Send AJAX request to swap positions in the database.
             fetch('includes/swap_bracket_position.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -312,7 +339,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!response.ok) { return response.text().then(text => { throw new Error(`Server Error: ${response.status}\n${text}`); }); }
                 return response.json();
             }).then(data => {
-                if (data.status === 'success') { location.reload(); } 
+                if (data.status === 'success') { 
+                    location.reload(); // Reload page to reflect the swap.
+                } 
                 else { alert('API Error: ' + data.message); if (draggedElement) draggedElement.style.opacity = '1'; }
             }).catch(error => {
                 console.error("Swap Request Failed:", error);
@@ -320,7 +349,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (draggedElement) draggedElement.style.opacity = '1';
             });
         });
+
         elem.addEventListener('dragend', (e) => {
+            // Reset styles on drag end.
             if (draggedElement) { draggedElement.style.opacity = '1'; }
             draggedElement = null;
         });
@@ -403,7 +434,7 @@ document.addEventListener('DOMContentLoaded', () => {
     justify-content: center;
     position: relative;
     flex-grow: 1; 
-    margin-bottom: 1.5rem; /* Space for match number and connectors */
+    margin-bottom: 1.5rem;
 }
 .bracket-teams {
     background-color: var(--bg-light);
@@ -470,7 +501,7 @@ document.addEventListener('DOMContentLoaded', () => {
     color: #888;
     font-size: 0.75rem;
     margin-bottom: 0.25rem;
-    height: 1rem; /* Ensures space is always reserved */
+    height: 1rem;
 }
 
 /* --- Spacers for Alignment --- */

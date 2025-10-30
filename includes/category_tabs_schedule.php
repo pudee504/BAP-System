@@ -1,3 +1,10 @@
+<?php
+// ============================================
+// File: includes/category_tabs_schedule.php
+// Purpose: Displays and manages the "Schedule" tab for a category,
+// including generating, viewing, updating, and regenerating game schedules.
+// ============================================
+?>
 <div class="tab-content <?= $active_tab === 'schedule' ? 'active' : '' ?>" id="schedule">
     <div class="section-header">
         <h2>Schedule</h2>
@@ -7,6 +14,7 @@
         <?php if (!$scheduleGenerated): ?>
             <?php if ($isLocked): ?>
                 <?php 
+                // Determine which generator file to use based on format type.
                 $action_url = '';
                 if ($category['format_name'] === 'Single Elimination') {
                     $action_url = 'single_elimination.php';
@@ -16,11 +24,13 @@
                     $action_url = 'round_robin.php';
                 }
                 ?>
+                <!-- Schedule generation form -->
                 <form action="<?= $action_url ?>" method="POST" onsubmit="return confirm('This will generate the schedule based on the locked settings. This action cannot be undone. Proceed?')">
                     <input type="hidden" name="category_id" value="<?= $category_id ?>">
                     <button type="submit" class="btn btn-primary">Generate <?= htmlspecialchars($category['format_name']) ?> Schedule</button>
                 </form>
             <?php else: ?>
+                <!-- Display message if the bracket/groups are not locked yet -->
                 <?php
                 $lock_type_message = (strtolower($category['format_name']) === 'round robin') 
                     ? "lock the groups" 
@@ -30,12 +40,15 @@
                 <p>You must fill all team slots and <?= $lock_type_message ?> in the 'Standings' tab before generating a schedule.</p>
             <?php endif; ?>
         <?php else: ?>
+            <!-- Display success message when schedule is already generated -->
             <p class="success-message" style="margin-bottom: 1rem;"><strong>Schedule has been generated.</strong></p>
 
             <?php if ($hasFinalGames): ?>
+                <!-- Cannot regenerate schedule if any game is final -->
                 <button class="btn" disabled>Regenerate Schedule</button>
                 <p>Cannot regenerate schedule because at least one game has a 'Final' status.</p>
             <?php else: ?>
+                <!-- Allow regeneration of schedule (clears all games) -->
                 <form action="clear_schedule.php" method="POST" onsubmit="return confirm('WARNING: This will delete all existing games and allow you to generate a new schedule. This action cannot be undone. Proceed?')">
                     <input type="hidden" name="category_id" value="<?= $category_id ?>">
                     <button type="submit" class="btn btn-danger">Regenerate Schedule</button>
@@ -45,6 +58,7 @@
     </div>
 
     <?php
+    // Fetch all scheduled games with team names for display.
     $scheduleStmt = $pdo->prepare("
         SELECT g.*, t1.team_name AS home_name, t2.team_name AS away_name
         FROM game g
@@ -65,6 +79,7 @@
     ?>
 
     <?php if ($games): ?>
+        <!-- Display game schedule table -->
         <div class="table-wrapper">
             <table class="category-table">
                 <thead>
@@ -83,6 +98,7 @@
                             <td><?= $index + 1 ?></td>
                             <td><?= htmlspecialchars($game['round_name'] ?: 'Round ' . $game['round']) ?></td>
                             
+                            <!-- Match teams display -->
                             <td class="match-cell">
                                 <div class="match-grid">
                                     <div class="team-name">
@@ -103,9 +119,15 @@
                             <td>
                                 <?= ($game['game_status'] === 'Final' || $game['winnerteam_id']) ? 'Final' : 'Pending' ?>
                             </td>
+
+                            <!-- Display or edit game date -->
                             <td id="game-date-<?= $game['id'] ?>">
-                                <?= ($game['game_date'] && $game['game_date'] !== '0000-00-00 00:00:00') ? date("F j, Y g:i A", strtotime($game['game_date'])) : '<span style="color: red;">Not Set</span>' ?>
+                                <?= ($game['game_date'] && $game['game_date'] !== '0000-00-00 00:00:00') 
+                                    ? date("F j, Y g:i A", strtotime($game['game_date'])) 
+                                    : '<span style="color: red;">Not Set</span>' ?>
                             </td>
+
+                            <!-- Action buttons -->
                             <td>
                                 <button type="button" class="btn btn-secondary btn-sm" onclick="toggleDateForm(<?= $game['id'] ?>)">Set Date</button>
                                 <div id="date-form-<?= $game['id'] ?>" class="set-date-form">
@@ -116,7 +138,7 @@
                                         <button type="submit" class="btn btn-primary btn-sm">Save</button>
                                     </form>
                                 </div>
-                                <a href="manager_game.php?game_id=<?= $game['id'] ?>&category_id=<?= $category_id ?>" class="btn btn-primary btn-sm" style="margin-top: 0.5rem;">Manage Game</a>
+                                <a href="manage_game.php?game_id=<?= $game['id'] ?>&category_id=<?= $category_id ?>" class="btn btn-primary btn-sm" style="margin-top: 0.5rem;">Manage Game</a>
                             </td>
                         </tr>
                     <?php endforeach; ?>

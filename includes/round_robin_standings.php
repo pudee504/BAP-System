@@ -1,7 +1,8 @@
 <?php
-// This is the complete and corrected file for both the Groupings Preview and the final Standings.
+// FILENAME: includes/round_robins_standings.php
+// DESCRIPTION: Displays the main content for a round-robin tournament.
 
-// --- PRIMARY CHECK: Have all team slots been filled? ---
+// --- STATE 1: Not all teams have been added ---
 if (!$all_slots_filled):
 ?>
     <div class="section-header">
@@ -12,35 +13,36 @@ if (!$all_slots_filled):
     </p>
 
 <?php
-// If all slots ARE filled, then we show either the preview or the final standings.
+// --- STATE 2 & 3: All team slots are filled ---
 else:
 ?>
     <?php 
-    // Fetch the lock status early so we can use it throughout the file.
+    // Fetch the group lock status; this controls drag-and-drop and button visibility.
     $lockStmt = $pdo->prepare("SELECT groups_locked FROM category WHERE id = ?");
     $lockStmt->execute([$category_id]);
     $groups_are_locked = $lockStmt->fetchColumn();
     
-    // Use 0-indexed cluster_name for Group A, B, C...
+    // Helper function to convert a 0-indexed number to a letter (0=A, 1=B, etc.).
     if (!function_exists('numberToLetter')) {
         function numberToLetter($num) { return chr(65 + (int)$num); }
     }
 
-    // --- VIEW 1: PRE-SCHEDULE (Show Team Groupings with Drag & Drop) ---
+    // --- STATE 2: Schedule NOT Generated (Show Groupings Preview) ---
     if (!$scheduleGenerated): 
     ?>
     <div class="section-header">
         <h2>Groupings Preview</h2>
     </div>
     
-    <?php if (!$groups_are_locked): ?>
+    <?php // Display instructions based on whether groups are locked.
+    if (!$groups_are_locked): ?>
         <p>Drag a team and drop it onto another team to swap their positions.</p>
     <?php else: ?>
         <p class="success-message"><strong>Groups are locked.</strong> You can now generate the schedule in the 'Schedule' tab or unlock groups to make changes.</p>
     <?php endif; ?>
 
     <?php
-    // Display any feedback messages from the server after a swap
+    // Display any success or error messages from a team swap action.
     if (isset($_SESSION['swap_message'])) {
         $message = $_SESSION['swap_message'];
         $is_error = strpos(strtolower($message), 'error') !== false || strpos(strtolower($message), 'invalid') !== false;
@@ -49,7 +51,7 @@ else:
         unset($_SESSION['swap_message']);
     }
 
-    // Fetch and organize teams for the preview
+    // Fetch all teams and their assigned group (cluster) for display.
     $groupingStmt = $pdo->prepare("
         SELECT t.id as team_id, t.team_name, c.cluster_name 
         FROM team t 
@@ -60,6 +62,7 @@ else:
     $groupingStmt->execute([$category_id]);
     $team_groupings_raw = $groupingStmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Organize the flat team list into a nested array, grouped by cluster_name.
     $grouped_teams = [];
     foreach ($team_groupings_raw as $team) {
         $grouped_teams[$team['cluster_name']][] = $team;
@@ -99,12 +102,13 @@ else:
             </form>
         <?php else: ?>
             <?php
-            // Check for finished games *before* showing the unlock button
+            // Check if any games have been played before allowing an unlock.
             $gamesPlayedStmt = $pdo->prepare("SELECT COUNT(*) FROM game WHERE category_id = ? AND winnerteam_id IS NOT NULL");
             $gamesPlayedStmt->execute([$category_id]);
             $hasFinishedGames = $gamesPlayedStmt->fetchColumn() > 0;
             ?>
-            <?php if (!$hasFinishedGames): ?>
+            <?php // Only show the "Unlock" button if no games have been completed.
+            if (!$hasFinishedGames): ?>
                 <form action="toggle_group_lock.php" method="POST" onsubmit="return confirm('Are you sure you want to unlock these groups?');">
                     <input type="hidden" name="category_id" value="<?= $category_id ?>">
                     <input type="hidden" name="lock_status" value="0">
@@ -116,7 +120,7 @@ else:
 
 
     <?php 
-    // --- VIEW 2: POST-SCHEDULE (Show Standings Table) ---
+    // --- STATE 3: Schedule IS Generated (Show Standings Table) ---
     else: 
     ?>
     <div class="section-header">
@@ -124,7 +128,7 @@ else:
     </div>
     
     <?php
-    // --- Display general session messages ---
+    // Display general success/error messages (e.g., "Playoffs created").
     if (isset($_SESSION['message'])) {
         $message = $_SESSION['message'];
         $is_error = strpos(strtolower($message), 'error') !== false;
@@ -134,11 +138,11 @@ else:
     }
 
     // ========================================================================
-    // START: MODIFIED LOGIC
-    // This block replaces the entire on-the-fly calculation
+    // START: Standings Calculation Logic
+    // This logic fetches pre-calculated data, groups it, and sorts it.
     // ========================================================================
 
-    // STEP 1: Fetch pre-calculated standings data
+    // STEP 1: Fetch all pre-calculated standings data from the 'cluster_standing' table.
     $standingsStmt = $pdo->prepare("
         SELECT
             t.id AS team_id,
@@ -162,7 +166,7 @@ else:
     $standingsStmt->execute([$category_id]);
     $all_standings_raw = $standingsStmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // STEP 2: Group standings by CLUSTER NAME
+    // STEP 2: Organize the standings data into a nested array, grouped by cluster_name.
     $grouped_standings = [];
     foreach ($all_standings_raw as $team_stats) {
         $grouped_standings[$team_stats['cluster_name']][] = $team_stats;
@@ -170,10 +174,7 @@ else:
     ksort($grouped_standings); // Sort groups by cluster_name (0, 1, 2...)
 
 
-    // STEP 3: Sort teams within each group based on the pre-calculated data
-    // NOTE: This removes the head-to-head check, as that complex logic
-    // should ideally be handled when populating the table or by a rank column.
-    // For now, we sort by W, then PD, then PS.
+    // STEP 3: Sort teams within each group based on standings rules.
     foreach ($grouped_standings as &$group) {
         usort($group, function($a, $b) {
             // 1. Sort by Wins (descending)
@@ -191,12 +192,13 @@ else:
     unset($group); // Unset the reference
 
     // ========================================================================
-    // END: MODIFIED LOGIC
+    // END: Standings Calculation Logic
     // ========================================================================
     ?>
 
     <?php if (!empty($grouped_standings)): ?>
-        <?php foreach ($grouped_standings as $group_name => $teams_in_group): ?>
+        <?php // Loop through each group and render its standings table
+        foreach ($grouped_standings as $group_name => $teams_in_group): ?>
             <h3 class="group-header">Group <?= htmlspecialchars(numberToLetter($group_name)) ?></h3>
             <div class="table-wrapper">
                 <table class="category-table">
@@ -208,6 +210,7 @@ else:
                     </thead>
                     <tbody>
                         <?php foreach ($teams_in_group as $index => $team):
+                            // Check if this team's rank is within the advancing-team limit.
                             $advancing_class = ($index < (int)$category['advance_per_group']) ? 'advancing-team' : ''; ?>
                             <tr class="<?= $advancing_class ?>">
                                 <td><?= htmlspecialchars($team['team_name']) ?></td>
@@ -225,7 +228,9 @@ else:
     <?php endif; ?>
 
     <?php
-    // --- ACTION BUTTONS SECTION ---
+    // --- ACTION BUTTONS SECTION (e.g., Proceed to Playoffs) ---
+    
+    // Check if all scheduled group stage games have been marked as finished.
     $totalGamesStmt = $pdo->prepare("SELECT COUNT(*) FROM game WHERE category_id = ? AND stage = 'Group Stage'");
     $totalGamesStmt->execute([$category_id]);
     $total_games = $totalGamesStmt->fetchColumn();
@@ -236,22 +241,23 @@ else:
     
     $allGamesAreFinished = ($total_games > 0 && $total_games === $finished_games_count);
 
-    // === START: NEW CODE TO CHECK FOR EXISTING PLAYOFFS ===
+    // Check if a playoff category has already been generated from this one.
     $playoffCheckStmt = $pdo->prepare("SELECT playoff_category_id FROM category WHERE id = ?");
     $playoffCheckStmt->execute([$category_id]);
     $playoff_category_id = $playoffCheckStmt->fetchColumn();
-    // === END: NEW CODE ===
     ?>
 
     <div class="form-actions" style="text-align: left; margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color);">
         
-        <?php if ($allGamesAreFinished && empty($playoff_category_id)): ?>
+        <?php // CASE 1: All games are finished and playoffs have NOT been created.
+        if ($allGamesAreFinished && empty($playoff_category_id)): ?>
             <form action="create_playoffs.php" method="POST" onsubmit="return confirm('This will create a new Single Elimination category with the advancing teams. Are you sure you want to proceed?');">
                 <input type="hidden" name="category_id" value="<?= $category_id ?>">
                 <button type="submit" class="btn btn-primary">Proceed to Playoffs</button>
             </form>
 
-        <?php elseif ($allGamesAreFinished && !empty($playoff_category_id)): ?>
+        <?php // CASE 2: All games are finished and playoffs HAVE already been created.
+        elseif ($allGamesAreFinished && !empty($playoff_category_id)): ?>
             <button type="button" class="btn btn-primary" disabled>Playoffs Already Created</button>
             <p style="margin-top: 0.5rem;">
                 <a href="category_details.php?category_id=<?= htmlspecialchars($playoff_category_id) ?>&tab=schedule" style="font-weight: bold;">
@@ -259,10 +265,12 @@ else:
                 </a>
             </p>
 
-        <?php elseif ($groups_are_locked && $finished_games_count > 0): ?>
+        <?php // CASE 3: Games are still in progress.
+        elseif ($groups_are_locked && $finished_games_count > 0): ?>
             <p class="info-message">Finish all group stage games to proceed to the playoffs.</p>
 
-        <?php elseif ($groups_are_locked && $finished_games_count === 0): ?>
+        <?php // CASE 4: No games played. Allow admin to unlock and clear the (empty) schedule.
+        elseif ($groups_are_locked && $finished_games_count === 0): ?>
             <form action="toggle_group_lock.php" method="POST" onsubmit="return confirm('WARNING: Unlocking the groups will delete the entire generated schedule and any match data. Are you sure you want to proceed?');">
                 <input type="hidden" name="category_id" value="<?= $category_id ?>">
                 <input type="hidden" name="lock_status" value="0">
@@ -321,14 +329,17 @@ else:
     .team-name:hover {
         background-color: #e9ecef;
     }
+    /* Style for the drop target */
     .team-slot.over {
         border-color: var(--bap-orange);
         background-color: #fff3cd;
     }
+    /* Style for the element being dragged */
     .team-name.dragging {
         opacity: 0.5;
         box-shadow: var(--shadow);
     }
+    /* Disable drag-and-drop styles if groups are locked */
     .groups-locked .team-name {
         cursor: not-allowed;
     }
@@ -346,12 +357,12 @@ else:
     .group-header:first-of-type {
         margin-top: 0;
     }
+    /* Highlight teams that are advancing */
     .advancing-team td {
         background-color: #d4edda;
         font-weight: 600;
         color: #155724;
     }
-    /* Adding a visual checkmark for advancing teams */
     .advancing-team td:first-child::before {
         margin-right: 8px;
         color: #155724;
@@ -366,8 +377,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const swapForm = document.getElementById('swap-form');
     let draggedTeamId = null;
 
+    // Only add drag-and-drop listeners if the groups are not locked.
     if (document.querySelector('.group-slots:not(.groups-locked)')) {
         draggableTeams.forEach(team => {
+            // When a drag starts, store the team's ID and add a visual 'dragging' class.
             team.addEventListener('dragstart', (e) => {
                 draggedTeamId = e.target.getAttribute('data-team-id');
                 e.target.classList.add('dragging');
@@ -378,13 +391,19 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         dropSlots.forEach(slot => {
+            // Add/remove 'over' class for visual feedback when dragging over a slot.
             slot.addEventListener('dragover', (e) => { e.preventDefault(); slot.classList.add('over'); });
             slot.addEventListener('dragleave', () => { slot.classList.remove('over'); });
+            
+            // When a team is dropped onto another team's slot...
             slot.addEventListener('drop', (e) => {
                 e.preventDefault();
                 slot.classList.remove('over');
                 const targetTeamId = slot.getAttribute('data-team-id');
+                
+                // Check if the drop is valid (not on itself).
                 if (draggedTeamId && targetTeamId && draggedTeamId !== targetTeamId) {
+                    // Populate the hidden form with the two team IDs and submit it.
                     document.getElementById('form-team1-id').value = draggedTeamId;
                     document.getElementById('form-team2-id').value = targetTeamId;
                     swapForm.submit();

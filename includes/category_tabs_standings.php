@@ -1,3 +1,11 @@
+<?php
+// ============================================================
+// File: includes/category_tabs_standings.php
+// Purpose: Displays the Standings tab content depending on the
+//          tournament format (Bracket or Round Robin).
+// ============================================================
+?>
+
 <div class="tab-content <?= $active_tab === 'standings' ? 'active' : '' ?>" id="standings">
 
     <?php 
@@ -29,7 +37,7 @@
             } 
             // Otherwise, default to the Single Elimination visualizer.
             else {
-                require 'includes/bracket_visualizer.php'; 
+                require 'includes/single_elim_visualizer.php'; 
             }
             ?>
         <?php endif; ?>

@@ -1,4 +1,8 @@
 <?php
+// FILENAME: get_game_state.php
+// DESCRIPTION: API endpoint to fetch the complete real-time state of a game for the scoreboard display.
+// Includes scores, player stats, team fouls, and timeouts.
+
 header('Content-Type: application/json');
 require_once 'db.php';
 
@@ -8,7 +12,7 @@ if (!$game_id) {
     exit;
 }
 
-// 1. Fetch game details, including team IDs
+// --- 1. Fetch Basic Game Info ---
 $game_stmt = $pdo->prepare("SELECT hometeam_id, awayteam_id, hometeam_score, awayteam_score FROM game WHERE id = ?");
 $game_stmt->execute([$game_id]);
 $game = $game_stmt->fetch(PDO::FETCH_ASSOC);
@@ -18,38 +22,45 @@ if (!$game) {
     exit;
 }
 
-// === NEW: FETCH CURRENT QUARTER AND PERIODS ===
+// --- 2. Fetch Current Quarter/Period ---
+// Get the current quarter from the timer table (default to 1 if not found).
 $timer_stmt = $pdo->prepare("SELECT quarter_id FROM game_timer WHERE game_id = ?");
 $timer_stmt->execute([$game_id]);
 $current_quarter = $timer_stmt->fetchColumn() ?: 1;
 
+// Determine the current timeout period (1st half, 2nd half, or OT).
 if ($current_quarter <= 2) { $timeout_period = 1; } 
 elseif ($current_quarter <= 4) { $timeout_period = 2; } 
-else { $timeout_period = $current_quarter; } // For overtime
+else { $timeout_period = $current_quarter; } // OT periods each get their own timeout counts.
 
-// === NEW: FUNCTIONS TO LOAD FOULS AND TIMEOUTS (adapted from manager page) ===
+// --- 3. Helper Functions for Fouls & Timeouts ---
+/** Fetches team fouls for a specific quarter. */
 function loadTeamFouls(PDO $pdo, $game_id, $team_id, $quarter) {
     $stmt = $pdo->prepare("SELECT fouls FROM game_team_fouls WHERE game_id = ? AND team_id = ? AND quarter = ?");
     $stmt->execute([$game_id, $team_id, $quarter]);
     return (int)($stmt->fetchColumn() ?? 0);
 }
 
+/** Fetches remaining timeouts for a specific period (half/OT). */
 function loadTimeouts(PDO $pdo, $game_id, $team_id, $period) {
     $stmt = $pdo->prepare("SELECT remaining_timeouts FROM game_timeouts WHERE game_id = ? AND team_id = ? AND half = ?");
     $stmt->execute([$game_id, $team_id, $period]);
     $result = $stmt->fetchColumn();
+    // If no record exists, return the default FIBA timeouts.
     if ($result !== false) { return (int)$result; }
-    if ($period == 1) { return 2; } 
-    elseif ($period == 2) { return 3; } 
-    else { return 1; }
+    if ($period == 1) { return 2; }       // 2 timeouts in 1st half
+    elseif ($period == 2) { return 3; }   // 3 timeouts in 2nd half
+    else { return 1; }                   // 1 timeout per OT period
 }
 
+// --- 4. Load Fouls & Timeouts using Helper Functions ---
 $home_timeouts = loadTimeouts($pdo, $game_id, $game['hometeam_id'], $timeout_period);
 $away_timeouts = loadTimeouts($pdo, $game_id, $game['awayteam_id'], $timeout_period);
 $home_fouls = loadTeamFouls($pdo, $game_id, $game['hometeam_id'], $current_quarter);
 $away_fouls = loadTeamFouls($pdo, $game_id, $game['awayteam_id'], $current_quarter);
 
-// 2. Fetch all player stats for the game (this query is unchanged)
+// --- 5. Fetch All Player Stats for the Game ---
+// Aggregates stats from game_statistic table for each player in the game.
 $player_query = "
     SELECT 
         pg.team_id, p.id AS player_id, p.first_name, p.last_name, pg.jersey_number, pg.is_playing,
@@ -74,10 +85,10 @@ $stats_stmt = $pdo->prepare($player_query);
 $stats_stmt->execute([$game_id]);
 $all_players = $stats_stmt->fetchAll(PDO::FETCH_ASSOC);
 
-// 3. Combine and return as JSON, now with new data
+// --- 6. Combine All Data into JSON Response ---
 $response = [
     'success' => true,
-     'current_quarter' => $current_quarter, // <-- ADD THIS LINE
+    'current_quarter' => $current_quarter,
     'scores' => [
         'home' => $game['hometeam_score'] ?? 0,
         'away' => $game['awayteam_score'] ?? 0,

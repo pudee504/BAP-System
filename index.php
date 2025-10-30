@@ -1,17 +1,17 @@
 <?php
-session_start();
-include 'db.php';
+// index.php
 
-// Generate a CSRF token if it doesn't exist yet
+session_start();
+include 'db.php'; // Connect to database
+
+// --- Generate CSRF token for form security ---
 if (empty($_SESSION['csrf_token'])) {
   $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
 }
 
-// Retrieve previously entered username from session if available
+// --- Keep username entered before failed login ---
 $username = $_SESSION['temp_username'] ?? '';
-
-// Remove it so it doesn't persist on future visits
-unset($_SESSION['temp_username']);
+unset($_SESSION['temp_username']); // Clear temp username after use
 ?>
 
 <!DOCTYPE html>
@@ -20,18 +20,20 @@ unset($_SESSION['temp_username']);
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Login - BAP Federation Makilala Chapter</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="css/style.css" />
 </head>
 <body class="login-page">
   <div class="login-container">
-    <img src="bap_logo.jpg" alt="BAP Federation Logo" class="login-logo">
+    <img src="assets/bap_logo.jpg" alt="BAP Federation Logo" class="login-logo">
     <h1>Welcome</h1>
 
+    <!-- Display error message after failed login -->
     <?php if (!empty($_SESSION['error'])): ?>
       <p class="error"><?= htmlspecialchars($_SESSION['error'], ENT_QUOTES, 'UTF-8') ?></p>
       <?php unset($_SESSION['error']); ?>
     <?php endif; ?>
 
+    <!-- Login form -->
     <form action="login.php" method="POST">
       <input type="hidden" name="csrf_token" value="<?= $_SESSION['csrf_token']; ?>">
 
@@ -54,9 +56,10 @@ unset($_SESSION['temp_username']);
           name="password" 
           required
         >
+        <!-- Password visibility toggle -->
         <div class="password-toggle">
-            <input type="checkbox" id="togglePassword">
-            <label for="togglePassword">Show Password</label>
+          <input type="checkbox" id="togglePassword">
+          <label for="togglePassword">Show Password</label>
         </div>
       </div>
 
@@ -65,11 +68,12 @@ unset($_SESSION['temp_username']);
   </div>
 
   <script>
+    // --- Toggle password visibility ---
     const toggle = document.getElementById('togglePassword');
     const passwordInput = document.getElementById('password');
 
-    toggle.addEventListener('change', function () {
-      passwordInput.type = this.checked ? 'text' : 'password';
+    toggle.addEventListener('change', () => {
+      passwordInput.type = toggle.checked ? 'text' : 'password';
     });
   </script>
 </body>

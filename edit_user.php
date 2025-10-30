@@ -1,6 +1,10 @@
 <?php
+// FILENAME: edit_user.php
+// DESCRIPTION: Admin-only page to update a user's role, password, and league assignments.
+
 session_start();
-// Security check to ensure only Admins can access this page
+// --- Security Check ---
+// Ensure the user is logged in and is an 'Admin'.
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['role_name']) || $_SESSION['role_name'] !== 'Admin') {
     header('Location: dashboard.php'); // Redirect non-admins
     exit();
@@ -8,6 +12,7 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['role_name']) || $_SESSION[
 
 $pdo = require 'db.php';
 
+// Get the ID of the user to be edited from the URL.
 $user_id_to_edit = $_GET['id'] ?? null;
 if (!$user_id_to_edit) {
     header('Location: users.php');
@@ -17,7 +22,11 @@ if (!$user_id_to_edit) {
 $error = '';
 $success = '';
 
-// Password validation function
+/**
+ * Validates a password against a set of security rules.
+ * @param string $password The password to check.
+ * @return true|string Returns true if valid, or an error message string if invalid.
+ */
 function is_password_valid($password) {
     $errors = [];
     if (strlen($password) < 8) { $errors[] = "must be at least 8 characters long"; }
@@ -28,7 +37,7 @@ function is_password_valid($password) {
     return empty($errors) ? true : "Password " . implode(', ', $errors) . ".";
 }
 
-// Handle form submission for updating a user
+// --- Handle Form Submission (POST request) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $password = $_POST['password'];
     $role_id = $_POST['role_id'];
@@ -36,30 +45,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $can_proceed = true;
 
-    // 1. Update password only if a new one is provided AND it's valid
+    // 1. Update password (if a new one is provided AND it's valid).
     if (!empty($password)) {
         $password_validation_result = is_password_valid($password);
         if ($password_validation_result !== true) {
             $error = $password_validation_result;
-            $can_proceed = false; // Stop the update if password is new but invalid
+            $can_proceed = false; // Stop update if password is new but invalid.
         } else {
+            // Hash the valid new password and update it.
             $password_hash = password_hash($password, PASSWORD_DEFAULT);
             $stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
             $stmt->execute([$password_hash, $user_id_to_edit]);
         }
     }
 
+    // Only proceed if the password (if set) was valid.
     if ($can_proceed) {
-        // 2. Update the role
+        // 2. Update the user's role.
         $stmt_role = $pdo->prepare("UPDATE users SET role_id = ? WHERE id = ?");
         $stmt_role->execute([$role_id, $user_id_to_edit]);
 
-        // 3. Update league assignments
+        // 3. Update league assignments (delete all, then re-add selected).
         $stmt_delete = $pdo->prepare("DELETE FROM league_manager_assignment WHERE user_id = ?");
         $stmt_delete->execute([$user_id_to_edit]);
 
         if (!empty($assigned_leagues)) {
-            $assignment_id = 1; 
+            $assignment_id = 1; // This ID seems static, might be a default.
             $stmt_assign = $pdo->prepare("INSERT INTO league_manager_assignment (user_id, league_id, assignment_id) VALUES (?, ?, ?)");
             foreach ($assigned_leagues as $league_id) {
                 $stmt_assign->execute([$user_id_to_edit, $league_id, $assignment_id]);
@@ -69,7 +80,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Fetch user data
+// --- Fetch data for the form ---
+// Get the user's current details.
 $stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$user_id_to_edit]);
 $user = $stmt->fetch(PDO::FETCH_ASSOC);
@@ -79,9 +91,11 @@ if (!$user) {
     exit();
 }
 
-// Fetch all roles, leagues, and the user's current assignments for the form
+// Get all roles for the dropdown.
 $all_roles = $pdo->query("SELECT id, role_name FROM role ORDER BY role_name")->fetchAll(PDO::FETCH_ASSOC);
+// Get all leagues for the checkbox list.
 $all_leagues = $pdo->query("SELECT id, league_name FROM league ORDER BY league_name")->fetchAll(PDO::FETCH_ASSOC);
+// Get the leagues this user is currently assigned to.
 $stmt_assigned = $pdo->prepare("SELECT league_id FROM league_manager_assignment WHERE user_id = ?");
 $stmt_assigned->execute([$user_id_to_edit]);
 $current_assignments = $stmt_assigned->fetchAll(PDO::FETCH_COLUMN);
@@ -91,10 +105,10 @@ $current_assignments = $stmt_assigned->fetchAll(PDO::FETCH_COLUMN);
 <head>
     <meta charset="UTF-8">
     <title>Edit User</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/style.css">
     
     <style>
-        /* Page-specific styles for custom components */
+        /* Styles for the real-time password validation UI */
         #password-validation-ui {
             list-style-type: none;
             padding: 0;
@@ -103,11 +117,10 @@ $current_assignments = $stmt_assigned->fetchAll(PDO::FETCH_COLUMN);
         }
         #password-validation-ui li {
             color: var(--bap-red);
-            margin-bottom: 0.25rem;
             transition: color 0.3s ease;
         }
         #password-validation-ui li.valid {
-            color: #155724; /* A good, accessible green */
+            color: #155724; /* Green for valid rules */
         }
         #password-validation-ui li.valid::before {
             content: '✓ ';
@@ -117,6 +130,7 @@ $current_assignments = $stmt_assigned->fetchAll(PDO::FETCH_COLUMN);
             content: '✗ ';
             font-weight: bold;
         }
+        /* Styles for the scrolling league assignment box */
         .league-checkbox-group {
             max-height: 150px;
             overflow-y: auto;
@@ -128,20 +142,6 @@ $current_assignments = $stmt_assigned->fetchAll(PDO::FETCH_COLUMN);
         .league-checkbox-group label {
             display: block;
             font-weight: normal;
-            margin-bottom: 0.5rem;
-            cursor: pointer;
-        }
-        .league-checkbox-group input[type="checkbox"] {
-            width: auto;
-            margin-right: 0.5rem;
-            vertical-align: middle;
-        }
-        .form-actions {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            align-items: center;
-            margin-top: 2rem;
         }
     </style>
 </head>
@@ -216,13 +216,15 @@ $current_assignments = $stmt_assigned->fetchAll(PDO::FETCH_COLUMN);
         const togglePasswordCheckbox = document.getElementById('togglePassword');
         const validationUI = document.getElementById('password-validation-ui');
         
-        // Initially hide the validation UI
+        // Hide the validation checklist initially.
         validationUI.style.display = 'none';
 
+        // Toggle password visibility (text/password).
         togglePasswordCheckbox.addEventListener('change', function() {
             passwordInput.type = this.checked ? 'text' : 'password';
         });
 
+        // Define the validation rules.
         const validators = {
             length: pass => pass.length >= 8,
             upper: pass => /[A-Z]/.test(pass),
@@ -231,11 +233,13 @@ $current_assignments = $stmt_assigned->fetchAll(PDO::FETCH_COLUMN);
             special: pass => /[\W_]/.test(pass)
         };
 
+        // Run validation on every keyup event in the password field.
         passwordInput.addEventListener('keyup', function() {
             const pass = passwordInput.value;
-            // Only show validation UI if user starts typing a new password
+            // Only show the checklist if the user has started typing.
             validationUI.style.display = pass.length > 0 ? 'block' : 'none';
 
+            // Check each rule and add/remove the 'valid' class.
             for (const [id, validator] of Object.entries(validators)) {
                 const el = document.getElementById(id);
                 if (validator(pass)) {

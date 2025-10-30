@@ -1,23 +1,26 @@
 <?php
-// Ensures the database connection is established.
-require_once __DIR__ . '/../db.php';
+// ============================================================
+// File: includes/category_info.php
+// Purpose: Fetches category details, format, and team data for
+// use in category_details.php and related includes.
+// ============================================================
 
-// Sanitize the category_id from the URL to ensure it's an integer.
+require_once __DIR__ . '/../db.php'; // Ensure database connection
+
+// Sanitize and validate category_id from URL
 $category_id = filter_var($_GET['category_id'] ?? null, FILTER_VALIDATE_INT);
-
 if (!$category_id) {
-    // Stop execution if the category_id is missing or invalid.
     die("Invalid category ID.");
 }
 
-// Fetch core details about the category, its format, and its current state.
+// Fetch category details including league, format, and structure
 $stmt = $pdo->prepare("
     SELECT
-        c.league_id, -- <<< THIS IS THE FIX
+        c.league_id,
         c.category_name,
         c.playoff_seeding_locked,
-        f.format_name, -- Fetched for category_details.php
-        f.format_name AS tournament_format, -- Aliased for the bracket visualizers
+        f.format_name,
+        f.format_name AS tournament_format, 
         cf.format_id,
         cf.num_teams,
         cf.num_groups,
@@ -32,26 +35,27 @@ $stmt->execute([$category_id]);
 $category = $stmt->fetch(PDO::FETCH_ASSOC);
 
 if (!$category) {
-    // Stop execution if no category is found with the given ID.
     die("Category not found.");
 }
 
-// Determine if the category format is a bracket type for conditional rendering later.
-// Note: We now use the aliased 'tournament_format' key for this logic.
-$is_bracket_format = in_array(strtolower($category['tournament_format']), ['single elimination', 'double elimination']);
+// Identify if the category format uses a bracket system
+$is_bracket_format = in_array(
+    strtolower($category['tournament_format']),
+    ['single elimination', 'double elimination']
+);
 
-// --- START: CORRECTED CODE BLOCK ---
-// Fetch teams based on the tournament format.
+// Fetch participating teams based on format type
 if ($is_bracket_format) {
-    // For bracket formats, fetch teams based on their position in the bracket.
+    // Bracket-based formats: order teams by bracket position
     $teamStmt = $pdo->prepare("
-        SELECT t.* FROM team t
+        SELECT t.* 
+        FROM team t
         JOIN bracket_positions bp ON t.id = bp.team_id
         WHERE t.category_id = ?
         ORDER BY bp.position ASC
     ");
 } else {
-    // For non-bracket formats (like Round Robin), fetch all teams directly.
+    // Non-bracket formats: fetch all teams normally
     $teamStmt = $pdo->prepare("
         SELECT * FROM team
         WHERE category_id = ?
@@ -62,22 +66,21 @@ if ($is_bracket_format) {
 $teamStmt->execute([$category_id]);
 $teams = $teamStmt->fetchAll(PDO::FETCH_ASSOC);
 $team_count = count($teams);
-// --- END: CORRECTED CODE BLOCK ---
 
-// Check if the number of registered teams has reached the maximum allowed for the category.
+// Determine if all team slots are filled
 $all_slots_filled = ($team_count >= $category['num_teams']);
 
-// Fetch the ordered bracket positions if it's a bracket-style tournament.
+// Fetch ordered bracket positions for bracket formats
 $bracket_positions = [];
 if ($is_bracket_format) {
     $posStmt = $pdo->prepare("
-    SELECT bp.position, bp.seed, bp.team_id, t.team_name /* <<< Added bp.seed */
-    FROM bracket_positions bp
-    LEFT JOIN team t ON bp.team_id = t.id
-    WHERE bp.category_id = ?
-    ORDER BY bp.position ASC
-");
-$posStmt->execute([$category_id]);
-$bracket_positions = $posStmt->fetchAll(PDO::FETCH_ASSOC);
+        SELECT bp.position, bp.seed, bp.team_id, t.team_name
+        FROM bracket_positions bp
+        LEFT JOIN team t ON bp.team_id = t.id
+        WHERE bp.category_id = ?
+        ORDER BY bp.position ASC
+    ");
+    $posStmt->execute([$category_id]);
+    $bracket_positions = $posStmt->fetchAll(PDO::FETCH_ASSOC);
 }
 ?>

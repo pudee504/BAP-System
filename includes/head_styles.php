@@ -1,5 +1,6 @@
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="css/style.css">
 <style>
+  /* --- Tab Navigation --- */
   .tabs {
     display: flex;
     margin-top: 20px;
@@ -16,15 +17,17 @@
     font-weight: bold;
   }
   .tab-content {
-    display: none;
+    display: none; /* All content hidden by default */
     padding: 20px;
     background: #fff;
     border: 1px solid #ccc;
     border-top: none;
   }
   .tab-content.active {
-    display: block;
+    display: block; /* The active tab's content is shown */
   }
+
+  /* --- Schedule / Match Display --- */
   .match-cell {
     padding: 0.5rem;
     line-height: 1.6;
@@ -33,9 +36,10 @@
     display: block;
     padding: 4px 0;
   }
+  /* Grid for displaying two teams in a match */
   .match-grid {
     display: grid;
-    grid-template-columns: 1fr auto;
+    grid-template-columns: 1fr auto; /* Team name takes available space, result takes auto */
     gap: 5px;
     align-items: center;
   }
@@ -51,6 +55,6 @@
     color: green;
   }
   .team-result.loss {
-    color: red; /* Optional: style losses differently */
+    color: red;
   }
 </style>

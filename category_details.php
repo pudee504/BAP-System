@@ -1,53 +1,53 @@
 <?php
-session_start();
-// FIX 1: Using "require_once" instead of "require" is critical. 
-// It prevents the infinite loop error you were seeing by ensuring this file is only ever included one time.
-require_once 'includes/category_info.php';
+// ============================================================
+// File: category_details.php
+// Purpose: Displays the details of a selected category including
+// teams, schedule, and standings with tab navigation and state handling.
+// ============================================================
 
+session_start();
+require_once 'includes/category_info.php'; // Prevents multiple inclusion
+
+// Redirect to login if not authenticated
 if (!isset($_SESSION['user_id'])) {
     $_SESSION['error'] = 'Please login first';
     header('Location: index.php');
     exit;
 }
 
-// Validate category ID from the URL query string.
+// Validate category ID from URL
 $category_id = $_GET['category_id'] ?? '';
 if (!$category_id) {
-    // If no category_id is provided, stop execution.
     die("Invalid category ID.");
 }
 
-// FIX 2: This is the targeted fix for the missing league name error.
-// Your original $category variable from category_info.php is preserved for other includes.
-// We fetch ONLY the league name here to safely display it in the title.
+// Fetch league name for title and breadcrumb
 $leagueNameStmt = $pdo->prepare("SELECT league_name FROM league WHERE id = ?");
 $leagueNameStmt->execute([$category['league_id']]);
 $league_name = $leagueNameStmt->fetchColumn();
 
-
-// Determine the active tab from the URL, defaulting to 'teams'.
+// Determine active tab from URL (default: 'teams')
 $active_tab = $_GET['tab'] ?? 'teams';
 $valid_tabs = ['teams', 'schedule', 'standings'];
 if (!in_array($active_tab, $valid_tabs)) {
-    $active_tab = 'teams'; // Default to 'teams' if the tab in the URL is invalid.
+    $active_tab = 'teams';
 }
 
-// Fetch all category lock statuses.
-$check = $pdo->prepare("SELECT schedule_generated, playoff_seeding_locked, groups_locked FROM category WHERE id = ?");
+// Fetch lock statuses for schedule, seeding, and groups
+$check = $pdo->prepare("
+    SELECT schedule_generated, playoff_seeding_locked, groups_locked 
+    FROM category 
+    WHERE id = ?
+");
 $check->execute([$category_id]);
 $categoryInfo = $check->fetch(PDO::FETCH_ASSOC);
 
 $scheduleGenerated = $categoryInfo['schedule_generated'] ?? false;
-
-// Specific lock variables
 $bracketLocked = $categoryInfo['playoff_seeding_locked'] ?? false;
 $groupsLocked = $categoryInfo['groups_locked'] ?? false;
-
-// A general variable to check if the category is locked in ANY way.
 $isLocked = $bracketLocked || $groupsLocked;
 
-
-// Check if any games have a final status, which might prevent regeneration.
+// Check if any games are finalized (prevents schedule regeneration)
 $hasFinalGames = false;
 if ($scheduleGenerated) {
     $finalCheck = $pdo->prepare("
@@ -67,10 +67,9 @@ if ($scheduleGenerated) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($category['category_name']) ?> Details</title>
-    
-    <?php include 'includes/head_styles.php'; ?>
-    <link rel="stylesheet" href="style.css"> 
 
+    <?php include 'includes/head_styles.php'; ?>
+    <link rel="stylesheet" href="css/style.css">
     <script src="js/Sortable.min.js"></script>
 </head>
 <body>
@@ -81,7 +80,9 @@ if ($scheduleGenerated) {
     
     <div class="page-header">
         <h1>
-            <a href="league_details.php?id=<?= $category['league_id'] ?>"><?= htmlspecialchars($league_name) ?></a>: 
+            <a href="league_details.php?id=<?= $category['league_id'] ?>">
+                <?= htmlspecialchars($league_name) ?>
+            </a>: 
             <?= htmlspecialchars($category['category_name']) ?>
         </h1>
     </div>
@@ -90,7 +91,10 @@ if ($scheduleGenerated) {
         <p><strong>Format:</strong> <?= htmlspecialchars($category['format_name']) ?></p>
         <p><strong>Teams:</strong> <?= htmlspecialchars($category['num_teams']) ?></p>
         <?php if (!empty($category['num_groups'])): ?>
-            <p><strong>Groups:</strong> <?= htmlspecialchars($category['num_groups']) ?> (<?= htmlspecialchars($category['advance_per_group']) ?> advance per group)</p>
+            <p><strong>Groups:</strong> 
+                <?= htmlspecialchars($category['num_groups']) ?> 
+                (<?= htmlspecialchars($category['advance_per_group']) ?> advance per group)
+            </p>
         <?php endif; ?>
     </div>
 
@@ -103,22 +107,22 @@ if ($scheduleGenerated) {
         <?php include 'includes/category_tabs_schedule.php'; ?>
         <?php include 'includes/category_tabs_standings.php'; ?>
     </div>
-
 </div>
 
 <script>
+// Handle tab switching and update URL
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.tab').forEach(tab => {
         tab.addEventListener('click', (e) => {
             e.preventDefault();
-            
+
             document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
             document.querySelectorAll('.tab-content').forEach(tc => tc.classList.remove('active'));
-            
+
             tab.classList.add('active');
             const tabId = tab.getAttribute('data-tab');
             document.getElementById(tabId).classList.add('active');
-            
+
             const url = new URL(window.location);
             url.searchParams.set('tab', tabId);
             window.history.pushState({}, '', url);
@@ -126,14 +130,15 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+// Toggle game date form visibility
 function toggleDateForm(gameId) {
     const form = document.getElementById('date-form-' + gameId);
     if (form) {
-        form.style.display = (form.style.display === 'none' || form.style.display === '') ? 'block' : 'none';
+        form.style.display = (form.style.display === 'none' || form.style.display === '') 
+            ? 'block' : 'none';
     }
 }
 </script>
 
 </body>
 </html>
-

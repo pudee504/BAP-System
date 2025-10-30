@@ -1,21 +1,25 @@
 <?php
+// FILENAME: delete_player.php
+// DESCRIPTION: Removes a player's association with a specific team (from player_team table).
+// It does NOT delete the player record itself, preserving historical stats.
+
 require 'db.php';
 session_start();
 require_once 'logger.php'; 
 
-$id = (int) ($_GET['id'] ?? 0);
-$team_id = (int) ($_GET['team_id'] ?? 0);
+// --- 1. Validate Input ---
+$id = (int) ($_GET['id'] ?? 0);       // Player ID
+$team_id = (int) ($_GET['team_id'] ?? 0); // Team ID
 
 if (!$id || !$team_id) {
     log_action('REMOVE_PLAYER_FROM_TEAM', 'FAILURE', 'Attempted to remove a player with a missing player or team ID.');
     die("Invalid ID provided.");
 }
 
-// --- Start Transaction ---
 $pdo->beginTransaction();
 
 try {
-    // --- STEP 1: Fetch player and team details for logging ---
+    // --- 2. Fetch Names (for logging) ---
     $playerStmt = $pdo->prepare("SELECT first_name, last_name FROM player WHERE id = ?");
     $playerStmt->execute([$id]);
     $player = $playerStmt->fetch();
@@ -27,32 +31,29 @@ try {
     if (!$player || !$team) {
         throw new Exception("Player or Team not found.");
     }
-    
     $player_name = $player['first_name'] . ' ' . $player['last_name'];
     $team_name = $team['team_name'];
 
-    // --- STEP 2: The Core Change - Only delete from the linking table ---
-    // This removes the player from the team's roster but keeps the player's
-    // record and all historical stats in other tables (like game_statistic).
+    // --- 3. Remove Player-Team Link ---
+    // Delete the specific row linking this player to this team.
     $stmt = $pdo->prepare("DELETE FROM player_team WHERE player_id = ? AND team_id = ?");
     $stmt->execute([$id, $team_id]);
 
-    // --- STEP 3: Commit the change ---
     $pdo->commit();
 
-    // --- STEP 4: Log the successful action ---
+    // --- 4. Log Success ---
     $log_details = "Removed player '{$player_name}' (ID: {$id}) from team '{$team_name}' (ID: {$team_id}).";
     log_action('REMOVE_PLAYER_FROM_TEAM', 'SUCCESS', $log_details);
 
 } catch (Exception $e) {
-    // If anything failed, roll back all changes
+    // --- 5. Handle Errors ---
     $pdo->rollBack();
-    
-    // Log the error
     $log_details = "Database error trying to remove player (ID: {$id}) from team (ID: {$team_id}). Error: " . $e->getMessage();
     log_action('REMOVE_PLAYER_FROM_TEAM', 'FAILURE', $log_details);
     die("A database error occurred. The player could not be removed from the team.");
 }
 
+// --- 6. Redirect Back ---
 header("Location: team_details.php?team_id=$team_id");
 exit;
+?>

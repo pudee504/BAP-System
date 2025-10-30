@@ -1,5 +1,9 @@
 <?php
+// FILENAME: delete_user.php
+// DESCRIPTION: Admin-only script to delete a user and their league assignments.
+
 session_start();
+// --- Authentication & Authorization Check ---
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit();
@@ -7,31 +11,33 @@ if (!isset($_SESSION['user_id'])) {
 
 $pdo = require 'db.php';
 
+// --- 1. Get User ID ---
 $user_id_to_delete = $_GET['id'] ?? null;
 
 if ($user_id_to_delete) {
-    // Begin a transaction
+    // --- 2. Database Deletion (Transaction) ---
     $pdo->beginTransaction();
     try {
-        // Step 1: Delete all assignments for this user from the linking table.
-        // This is necessary because your schema does not have ON DELETE CASCADE.
+        // a. Delete user's league assignments first (due to lack of CASCADE).
         $stmt_assign = $pdo->prepare("DELETE FROM league_manager_assignment WHERE user_id = ?");
         $stmt_assign->execute([$user_id_to_delete]);
 
-        // Step 2: Delete the user from the users table.
+        // b. Delete the user record.
         $stmt_user = $pdo->prepare("DELETE FROM users WHERE id = ?");
         $stmt_user->execute([$user_id_to_delete]);
         
-        // If both queries succeed, commit the transaction
+        // c. Commit if both deletions succeed.
         $pdo->commit();
+        // TODO: Add logging for successful deletion.
     } catch (Exception $e) {
-        // If anything fails, roll back the transaction
+        // d. Roll back on any error.
         $pdo->rollBack();
-        // Optionally, you could set an error message in the session and display it on users.php
-        // For now, we'll just redirect.
+        
     }
 }
 
-// Redirect back to the user list
+// --- 3. Redirect Back ---
+// Always redirect back to the user list, whether deletion succeeded or not.
 header('Location: users.php');
 exit();
+?>

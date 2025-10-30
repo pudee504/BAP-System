@@ -1,7 +1,11 @@
 <?php
+// FILENAME: change_password.php
+// DESCRIPTION: Allows a logged-in user to change their own password.
+
 session_start();
 
-// Redirect to login page if user is not logged in
+// --- 1. Authentication Check ---
+// Redirect to login page if user is not logged in.
 if (!isset($_SESSION['user_id'])) {
     header('Location: login.php');
     exit();
@@ -12,7 +16,10 @@ $pdo = require 'db.php';
 $error = '';
 $success = '';
 
-// Password validation function (consistent with users.php)
+/**
+ * Validates a password against security rules.
+ * @return true|string True if valid, or an error message string if invalid.
+ */
 function is_password_valid($password) {
     $errors = [];
     if (strlen($password) < 8) { $errors[] = "must be at least 8 characters long"; }
@@ -23,27 +30,33 @@ function is_password_valid($password) {
     return empty($errors) ? true : "Password " . implode(', ', $errors) . ".";
 }
 
+// --- 2. Handle Form Submission (POST request) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $current_password = $_POST['current_password'];
     $new_password = $_POST['new_password'];
     $confirm_password = $_POST['confirm_password'];
     $user_id = $_SESSION['user_id'];
 
-    // Fetch the user's current hashed password from the database
+    // --- 3. Validation Logic ---
+    // Fetch the user's current hashed password.
     $stmt = $pdo->prepare("SELECT password FROM users WHERE id = ?");
     $stmt->execute([$user_id]);
     $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
+    // a. Check if the current password is correct.
     if (!$user || !password_verify($current_password, $user['password'])) {
         $error = 'Your current password is not correct.';
+    // b. Check if the new passwords match.
     } elseif ($new_password !== $confirm_password) {
         $error = 'The new passwords do not match.';
     } else {
+        // c. Check if the new password meets security rules.
         $validation_result = is_password_valid($new_password);
         if ($validation_result !== true) {
             $error = $validation_result;
         } else {
-            // All checks passed, update the password
+            // --- 4. Update Password ---
+            // All checks passed, hash and update the new password.
             $new_password_hash = password_hash($new_password, PASSWORD_DEFAULT);
             $update_stmt = $pdo->prepare("UPDATE users SET password = ? WHERE id = ?");
             if ($update_stmt->execute([$new_password_hash, $user_id])) {
@@ -60,24 +73,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <title>Change Password</title>
-    <link rel="stylesheet" href="style.css"> 
+    <link rel="stylesheet" href="css/style.css"> 
     
     <style>
-        /* Using the same consistent container style */
+        /* Styles for the change password form */
         .main-container { max-width: 960px; margin: 2rem auto; background: white; color: #333; padding: 2rem; border-radius: 12px; }
         .main-container h1 { color: #1f2593; margin-bottom: 1.5rem; }
-        .form-section { background-color: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #eee; }
-        .message { padding: 10px; margin-bottom: 15px; border-radius: 5px; color: #333; }
+        .form-section { background-color: #f9f9f9; padding: 20px; border-radius: 8px; border: 1px solid #eee; }
+        .message { padding: 10px; margin-bottom: 15px; border-radius: 5px; }
         .error { background-color: #f8d7da; color: #721c24; }
         .success { background-color: #d4edda; color: #155724; }
         .form-group { margin-bottom: 15px; }
-        label { display: block; margin-bottom: 5px; color: #333; font-weight: bold; }
-        .main-container input[type="password"] { color: #333; background-color: #fff; border: 1px solid #ccc; width: 100%; padding: 8px; box-sizing: border-box; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .main-container input[type="password"] { border: 1px solid #ccc; width: 100%; padding: 8px; box-sizing: border-box; }
         button { padding: 10px 15px; background-color: #ff6b00; color: white; border: none; cursor: pointer; border-radius: 8px; font-weight: bold; }
-        button:hover { background-color: #e65c00; }
-        .password-toggle { margin-top: 10px; }
+        /* Styles for the real-time password validation UI */
         #password-validation-ui { list-style-type: none; padding: 0; margin-top: 10px; font-size: 0.9em; }
-        #password-validation-ui li { color: #dc3545; margin-bottom: 4px; }
+        #password-validation-ui li { color: #dc3545; }
         #password-validation-ui li.valid { color: #28a745; }
         #password-validation-ui li.valid::before { content: '✓ '; }
         #password-validation-ui li::before { content: '✗ '; }
@@ -132,11 +144,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         const newPasswordInput = document.getElementById('new_password');
         const togglePasswordCheckbox = document.getElementById('togglePassword');
         
-        // Password visibility toggle for the new password field
+        // Toggle password visibility (text/password).
         togglePasswordCheckbox.addEventListener('change', function() {
             newPasswordInput.type = this.checked ? 'text' : 'password';
         });
 
+        // Define the validation rules.
         const validators = {
             length: pass => pass.length >= 8,
             upper: pass => /[A-Z]/.test(pass),
@@ -145,11 +158,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             special: pass => /[\W_]/.test(pass)
         };
 
+        // Run validation on every keyup event in the new password field.
         newPasswordInput.addEventListener('keyup', function() {
             const pass = newPasswordInput.value;
-            // Only show validation UI if user starts typing a new password
+            // Only show the checklist if the user has started typing.
             document.getElementById('password-validation-ui').style.display = pass.length > 0 ? 'block' : 'none';
 
+            // Check each rule and add/remove the 'valid' class.
             for (const [id, validator] of Object.entries(validators)) {
                 const el = document.getElementById(id);
                 if (validator(pass)) {
@@ -160,7 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         });
 
-        // Initially hide the validation UI
+        // Hide the validation checklist initially.
         document.getElementById('password-validation-ui').style.display = 'none';
     });
     </script>

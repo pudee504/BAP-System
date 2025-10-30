@@ -1,33 +1,44 @@
 <?php
-session_start();
-include 'db.php';
-require_once 'logger.php'; 
+/* =============================================================================
+   FILE: create_league.php
+   PURPOSE: Allows logged-in users to create a new league entry.
+   ========================================================================== */
 
+session_start();
+include 'db.php'; // Database connection
+require_once 'logger.php'; // Activity logger
+
+// --- USER AUTHENTICATION CHECK ---
 if (!isset($_SESSION['user_id'])) {
     $_SESSION['error'] = 'Please login first';
     header('Location: index.php');
     exit;
 }
 
-// Initialize variables to avoid errors on page load
+// --- INITIALIZE VARIABLES ---
 $league_name = '';
 $location = '';
 $start_date = '';
 $end_date = '';
 $error = '';
 
+// --- HANDLE FORM SUBMISSION ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $league_name = isset($_POST['league_name']) ? trim($_POST['league_name']) : '';
     $location = isset($_POST['location']) ? trim($_POST['location']) : '';
     $start_date = $_POST['start_date'];
     $end_date = $_POST['end_date'];
 
+    // --- BASIC VALIDATION ---
     if ($league_name && $start_date && $end_date) {
+        // Prevent invalid date ranges
         if (strtotime($end_date) < strtotime($start_date)) {
             $error = "End date cannot be earlier than start date.";
             $log_details = "Attempted to create league '{$league_name}' with end date before start date.";
             log_action('CREATE_LEAGUE', 'FAILURE', $log_details);
+
         } else {
+            // --- CHECK FOR DUPLICATE LEAGUE ---
             $checkSql = "SELECT COUNT(*) FROM league WHERE league_name = :league_name AND location = :location";
             $checkStmt = $pdo->prepare($checkSql);
             $checkStmt->execute([':league_name' => $league_name, ':location' => $location]);
@@ -37,7 +48,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = "A league with this name and location already exists.";
                 $log_details = "Attempted to create a duplicate league named '{$league_name}' at location '{$location}'.";
                 log_action('CREATE_LEAGUE', 'FAILURE', $log_details);
+
             } else {
+                // --- INSERT NEW LEAGUE ---
                 $today = date('Y-m-d');
                 $status = ($today < $start_date) ? 'Upcoming' : 'Active';
                 
@@ -65,18 +78,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Create New League - BAP Federation</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+
 <?php include 'includes/header.php'; ?>
 
 <div class="form-container">
     <h1>Create a New League</h1>
 
+    <!-- DISPLAY ERROR MESSAGE -->
     <?php if (!empty($error)): ?>
         <div class="form-error"><?= htmlspecialchars($error) ?></div>
     <?php endif; ?>
     
+    <!-- LEAGUE CREATION FORM -->
     <form action="create_league.php" method="POST">
         <div class="form-group">
             <label for="league_name">League Name</label>

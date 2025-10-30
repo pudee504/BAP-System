@@ -1,21 +1,27 @@
 <?php
+// FILENAME: edit_team.php
+// DESCRIPTION: Displays and processes a form to update an existing team's name.
+
 require 'db.php';
 session_start();
-require_once 'logger.php'; 
+require_once 'logger.php'; // For logging admin actions
 
+// --- Authentication Check ---
 if (!isset($_SESSION['user_id'])) {
     $_SESSION['error'] = 'Please login first';
     header('Location: index.php');
     exit;
 }
 
+// --- 1. Get and Validate Team ID ---
 $team_id = filter_input(INPUT_GET, 'team_id', FILTER_VALIDATE_INT);
 if (!$team_id) {
     log_action('EDIT_TEAM', 'FAILURE', 'Attempted to access edit page with an invalid team ID.');
     die("Invalid team ID");
 }
 
-// Fetch current team data
+// --- 2. Fetch Current Team Data ---
+// Get the existing data to pre-fill the form.
 $stmt = $pdo->prepare("SELECT * FROM team WHERE id = ?");
 $stmt->execute([$team_id]);
 $team = $stmt->fetch();
@@ -25,30 +31,39 @@ if (!$team) {
     die("Team not found");
 }
 
-// Handle form submission
+// --- 3. Handle Form Submission (POST request) ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $new_name = trim($_POST['team_name']);
+    
+    // Validate that the name is not empty.
     if ($new_name) {
         try {
+            // Update the team name in the database.
             $update = $pdo->prepare("UPDATE team SET team_name = ? WHERE id = ?");
             $update->execute([$new_name, $team_id]);
 
+            // --- Log the update ---
             if ($team['team_name'] !== $new_name) {
+                // Log if the name actually changed.
                 $log_details = "Updated team in category ID {$team['category_id']}: changed name from '{$team['team_name']}' to '{$new_name}' (Team ID: {$team_id}).";
                 log_action('UPDATE_TEAM', 'SUCCESS', $log_details);
             } else {
+                // Log if the user submitted without making a change.
                 $log_details = "Submitted update for team '{$team['team_name']}' (ID: {$team_id}) with no changes.";
                 log_action('UPDATE_TEAM', 'INFO', $log_details);
             }
         } catch (PDOException $e) {
+            // Log any database errors.
             $log_details = "Database error updating team '{$team['team_name']}' (ID: {$team_id}). Error: " . $e->getMessage();
             log_action('UPDATE_TEAM', 'FAILURE', $log_details);
             die("A database error occurred.");
         }
 
+        // Redirect back to the team list on success.
         header("Location: category_details.php?category_id=" . $team['category_id'] . "&tab=teams");
         exit;
     } else {
+        // Handle validation error (empty name).
         $error = "Team name cannot be empty.";
         $log_details = "Failed to update team (ID: {$team_id}) because the name was empty.";
         log_action('UPDATE_TEAM', 'FAILURE', $log_details);
@@ -62,7 +77,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Edit Team</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
     <?php include 'includes/header.php'; ?>

@@ -1,7 +1,11 @@
 <?php
+// FILENAME: finalize_game.php
+// DESCRIPTION: API endpoint to mark a game as "Final".
+// It calculates the winner, updates standings, and advances teams in brackets.
+
 header('Content-Type: application/json');
 require_once 'db.php';
-// STEP 1: Include the winner logic file
+// Include the logic for advancing winners/losers in brackets.
 require_once 'winner_logic.php'; 
 
 $input = json_decode(file_get_contents('php://input'), true);
@@ -15,7 +19,7 @@ if (!$game_id) {
 try {
     $pdo->beginTransaction();
 
-    // 1. Fetch the game details and scores
+    // 1. Fetch game details, including format, stage, and scores.
     $stmt = $pdo->prepare("
         SELECT g.category_id, g.hometeam_id, g.awayteam_id, g.hometeam_score, g.awayteam_score,
                g.stage, f.format_name
@@ -32,7 +36,7 @@ try {
         throw new Exception("Game not found.");
     }
 
-    // 2. Determine the winner based on the score
+    // 2. Determine the winner based on the score.
     $winner_id = null;
     if ((int)$game['hometeam_score'] > (int)$game['awayteam_score']) {
         $winner_id = $game['hometeam_id'];
@@ -40,7 +44,7 @@ try {
         $winner_id = $game['awayteam_id'];
     }
     
-    // 3. Update the game record with the status and winner's ID
+    // 3. Update the game record to 'Final' and set the winner.
     $updateStmt = $pdo->prepare("
         UPDATE game 
         SET game_status = 'Final', winnerteam_id = ? 
@@ -48,15 +52,15 @@ try {
     ");
     $updateStmt->execute([$winner_id, $game_id]);
     
-    // 4. Also stop the timer
+    // 4. Stop the game timer.
     $timerStmt = $pdo->prepare("UPDATE game_timer SET running = 0 WHERE game_id = ?");
     $timerStmt->execute([$game_id]);
 
-    // === START: NEW LOGIC for cluster_standing ===
+    // === 5. Update Standings (Round Robin Group Stage ONLY) ===
     $isRoundRobinGroupGame = ($game['format_name'] === 'Round Robin' && $game['stage'] === 'Group Stage');
     
     if ($isRoundRobinGroupGame && $winner_id !== null) {
-        // Get cluster IDs for both teams
+        // Get the cluster (group) ID for both teams.
         $clusterStmt = $pdo->prepare("SELECT cluster_id FROM team WHERE id = ?");
         
         $clusterStmt->execute([$game['hometeam_id']]);
@@ -66,7 +70,7 @@ try {
         $away_cluster_id = $clusterStmt->fetchColumn();
 
         if ($home_cluster_id && $away_cluster_id) {
-            // Update Home Team
+            // Update Home Team's stats in the cluster_standing table.
             $updateHomeStmt = $pdo->prepare("
                 UPDATE cluster_standing SET
                     matches_played = matches_played + 1,
@@ -85,7 +89,7 @@ try {
                 $game['hometeam_id']
             ]);
 
-            // Update Away Team
+            // Update Away Team's stats in the cluster_standing table.
             $updateAwayStmt = $pdo->prepare("
                 UPDATE cluster_standing SET
                     matches_played = matches_played + 1,
@@ -105,10 +109,10 @@ try {
             ]);
         }
     }
-    // === END: NEW LOGIC ===
+    // === END: Standings Logic ===
 
-    // STEP 5: Call advanceWinner (Modified)
-    // Only advance if it's NOT a round robin group game
+    // === 6. Advance Teams (Bracket Formats ONLY) ===
+    // Only advance teams if it's a bracket game (not a group stage game).
     if ($winner_id && !$isRoundRobinGroupGame) {
         processGameResult($pdo, $game_id);
     }
