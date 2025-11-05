@@ -36,7 +36,7 @@ try {
     // If no games are finished, proceed to delete all games for this category.
     $deleteStmt = $pdo->prepare("DELETE FROM game WHERE category_id = ?");
     $deleteStmt->execute([$category_id]);
-    // Note: Consider also deleting from game_timer, game_statistic etc. if CASCADE is not set up.
+    
 
     // --- 4. Update Category Flags ---
     // Set `playoff_seeding_locked` to 0 (unlocked) and `schedule_generated` to 0.

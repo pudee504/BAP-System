@@ -85,22 +85,24 @@ if ($teams_are_set) {
     $player_query = "
     SELECT 
         p.id, p.first_name, p.last_name, pg.jersey_number, pg.is_playing, pg.display_order,
-        COALESCE(SUM(CASE WHEN s.statistic_name = '1PM' THEN gs.value ELSE 0 END), 0) AS '1PM',
-        COALESCE(SUM(CASE WHEN s.statistic_name = '2PM' THEN gs.value ELSE 0 END), 0) AS '2PM',
-        COALESCE(SUM(CASE WHEN s.statistic_name = '3PM' THEN gs.value ELSE 0 END), 0) AS '3PM',
-        COALESCE(SUM(CASE WHEN s.statistic_name = 'FOUL' THEN gs.value ELSE 0 END), 0) AS 'FOUL',
-        COALESCE(SUM(CASE WHEN s.statistic_name = 'REB' THEN gs.value ELSE 0 END), 0) AS 'REB',
-        COALESCE(SUM(CASE WHEN s.statistic_name = 'AST' THEN gs.value ELSE 0 END), 0) AS 'AST',
-        COALESCE(SUM(CASE WHEN s.statistic_name = 'BLK' THEN gs.value ELSE 0 END), 0) AS 'BLK',
-        COALESCE(SUM(CASE WHEN s.statistic_name = 'STL' THEN gs.value ELSE 0 END), 0) AS 'STL',
-        COALESCE(SUM(CASE WHEN s.statistic_name = 'TO' THEN gs.value ELSE 0 END), 0) AS 'TO'
+        COALESCE(SUM(CASE WHEN gl.action_type = '1PM' THEN 1 ELSE 0 END), 0) AS '1PM',
+        COALESCE(SUM(CASE WHEN gl.action_type = '2PM' THEN 1 ELSE 0 END), 0) AS '2PM',
+        COALESCE(SUM(CASE WHEN gl.action_type = '3PM' THEN 1 ELSE 0 END), 0) AS '3PM',
+        COALESCE(SUM(CASE WHEN gl.action_type = 'FOUL' OR gl.action_type = 'FOUL_OFFENSIVE' THEN 1 ELSE 0 END), 0) AS 'FOUL',
+        COALESCE(SUM(CASE WHEN gl.action_type = 'REB' THEN 1 ELSE 0 END), 0) AS 'REB',
+        COALESCE(SUM(CASE WHEN gl.action_type = 'AST' THEN 1 ELSE 0 END), 0) AS 'AST',
+        COALESCE(SUM(CASE WHEN gl.action_type = 'BLK' THEN 1 ELSE 0 END), 0) AS 'BLK',
+        COALESCE(SUM(CASE WHEN gl.action_type = 'STL' THEN 1 ELSE 0 END), 0) AS 'STL',
+        COALESCE(SUM(CASE WHEN gl.action_type = 'TO' THEN 1 ELSE 0 END), 0) AS 'TO'
     FROM player_game pg
     JOIN player p ON p.id = pg.player_id
-    LEFT JOIN game_statistic gs ON pg.player_id = gs.player_id AND pg.game_id = gs.game_id
-    LEFT JOIN statistic s ON gs.statistic_id = s.id
+    LEFT JOIN game_log gl ON pg.player_id = gl.player_id 
+                         AND pg.game_id = gl.game_id 
+                         AND gl.is_undone = 0
     WHERE pg.game_id = ? AND pg.team_id = ?
-    GROUP BY p.id, pg.jersey_number, pg.is_playing, pg.display_order
-    ORDER BY pg.is_playing DESC, pg.display_order ASC";
+    GROUP BY p.id, p.first_name, p.last_name, pg.jersey_number, pg.is_playing, pg.display_order
+    ORDER BY pg.is_playing DESC, pg.display_order ASC
+";
         
     $stmt = $pdo->prepare($player_query);
     $stmt->execute([$game_id, $game['hometeam_id']]);
@@ -223,6 +225,9 @@ if ($game_id && $current_quarter > 4) {
             <div class="game-actions">
                 <button class="btn" onclick="openScoreboardWindow()">Open Projector View</button>
                 <button class="btn btn-secondary" onclick="showOverridePanel()">Override Result</button>
+                <?php if ($game['game_status'] === 'Final'): ?>
+                    <button class="btn btn-danger" onclick="reopenGame()">Re-Open Game</button>
+                <?php endif; ?>
             </div>
         </div>
          <div id="overridePanel" style="display: none;" class="override-panel">
@@ -357,28 +362,17 @@ if ($game_id && $current_quarter > 4) {
                     fetch("update_team_fouls.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ game_id: gameData.gameId, team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id, quarter: currentQuarter, fouls: teamFouls[teamId] }) });
                 }
                 
-                fetch("update_stat.php", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ game_id: gameData.gameId, player_id: player.id, team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id, statistic_name: stat, value: delta })
-                }).then(res => res.json()).then(data => {
-                    if (data.success) {
-                        if (delta > 0) logStatChange(player, teamId, stat); 
-                        renderTeam(teamId);
-                        if (['1PM', '2PM', '3PM'].includes(stat)) {
-                            updateRunningScore(teamId);
-                        }
-                    } else {
-                        console.error("Failed to update stat:", data.error);
-                        player.stats[stat] = Math.max(0, player.stats[stat] - delta); // Revert
-                        if (stat === 'FOUL' && delta < 0) {
-                             teamFouls[teamId] = Math.max(0, teamFouls[teamId] - delta); 
-                             document.getElementById(teamId === 'teamA' ? 'foulsA' : 'foulsB').textContent = teamFouls[teamId];
-                             updateBonusUI();
-                        }
-                        renderTeam(teamId);
-                         if (['1PM', '2PM', '3PM'].includes(stat)) {
-                            updateRunningScore(teamId);
-                        }
-                    }
-                });
+                if (delta > 0) {
+    // Only log actions that add stats. 
+    // Undos are handled by the log list, not by this function.
+    logStatChange(player, teamId, stat); 
+}
+
+// Optimistically update UI. The page reload on undo/redo will fix any errors.
+renderTeam(teamId);
+if (['1PM', '2PM', '3PM'].includes(stat)) {
+    updateRunningScore(teamId);
+}
             }
 
             function showFoulPopover(buttonElement, teamId, playerIdx) {
@@ -450,31 +444,12 @@ if ($game_id && $current_quarter > 4) {
                     });
                 }
 
-                fetch("update_stat.php", { 
-                    method: "POST", 
-                    headers: { "Content-Type": "application/json" }, 
-                    body: JSON.stringify({ 
-                        game_id: gameData.gameId, 
-                        player_id: player.id, 
-                        team_id: teamId === 'teamA' ? gameData.teamA.id : gameData.teamB.id, 
-                        statistic_name: stat, 
-                        value: 1 
-                    })
-                }).then(res => res.json()).then(data => {
-                    if (data.success) {
-                        logStatChange(player, teamId, stat, foulType); 
-                        renderTeam(teamId);
-                    } else {
-                        console.error("Failed to update stat:", data.error);
-                        player.stats[stat] = Math.max(0, player.stats[stat] - 1); 
-                        if (foulType === 'Normal') {
-                            teamFouls[teamId] = Math.max(0, teamFouls[teamId] - 1); 
-                            document.getElementById(teamId === 'teamA' ? 'foulsA' : 'foulsB').textContent = teamFouls[teamId];
-                            updateBonusUI();
-                        }
-                        renderTeam(teamId);
-                    }
-                });
+                // [NEW LOGIC for handleFoulSelection function]
+// Log the action. This is the only "write" we need to do.
+logStatChange(player, teamId, stat, foulType);
+
+// Optimistically update the UI.
+renderTeam(teamId);
             }
 
             function cancelFoulSelection() {
@@ -505,6 +480,33 @@ if ($game_id && $current_quarter > 4) {
                 });
             }
 
+            async function reopenGame() {
+                if (!confirm("WARNING:\nThis will re-open the game and reverse the standings to fix a mistake.\n\nAre you sure you want to do this?")) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch('reopen_game.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ game_id: gameData.gameId })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        alert("Game re-opened successfully. The page will now reload.");
+                        location.reload();
+                    } else {
+                        alert("Failed to re-open game: " + result.error);
+                    }
+                } catch (error) {
+                    console.error("Error re-opening game:", error);
+                    alert("An error occurred. Check the console.");
+                }
+            }
+            
+
             function formatGameTime(ms) {
                 if (ms === null || ms < 0) return "00:00.0";
                 const totalSeconds = Math.floor(ms / 1000);
@@ -514,7 +516,7 @@ if ($game_id && $current_quarter > 4) {
                 // Show tenths only when under 1 minute for standard display
                  return totalSeconds < 60 ? `${minutes}:${seconds}.${tenths}` : `${minutes}:${seconds}`;
                  // Always return with tenths for the indicator:
-                // return `${minutes}:${seconds}.${tenths}`; 
+                 // return `${minutes}:${seconds}.${tenths}`; 
             }
 
              // **NEW**: Function to update the indicator display
@@ -666,7 +668,7 @@ if ($game_id && $current_quarter > 4) {
                         location.reload();
                         return; // Stop further processing after reload command
                     }
-                   
+                    
                     // Update fouls 
                     if (state.fouls) {
                         teamFouls.teamA = state.fouls.home[state.quarter_id] || 0;
@@ -739,7 +741,10 @@ if ($game_id && $current_quarter > 4) {
 
                 if (gameData.gameStatus === 'Final') {
                     document.querySelectorAll('input, button').forEach(el => {
-                        if (!el.textContent.includes("Undo") && !el.textContent.includes("Redo")) { el.disabled = true; }
+                        // THIS LINE IS MODIFIED
+                        if (!el.textContent.includes("Undo") && !el.textContent.includes("Redo") && !el.textContent.includes("Re-Open Game")) { 
+                            el.disabled = true; 
+                        }
                     });
                      // Disable foul popover buttons if game is final
                      document.querySelectorAll('#foulPopover button').forEach(btn => btn.disabled = true);

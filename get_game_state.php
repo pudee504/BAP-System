@@ -50,7 +50,7 @@ function loadTimeouts(PDO $pdo, $game_id, $team_id, $period) {
     if ($result !== false) { return (int)$result; }
     if ($period == 1) { return 2; }       // 2 timeouts in 1st half
     elseif ($period == 2) { return 3; }   // 3 timeouts in 2nd half
-    else { return 1; }                   // 1 timeout per OT period
+    else { return 1; }                    // 1 timeout per OT period
 }
 
 // --- 4. Load Fouls & Timeouts using Helper Functions ---
@@ -60,25 +60,25 @@ $home_fouls = loadTeamFouls($pdo, $game_id, $game['hometeam_id'], $current_quart
 $away_fouls = loadTeamFouls($pdo, $game_id, $game['awayteam_id'], $current_quarter);
 
 // --- 5. Fetch All Player Stats for the Game ---
-// Aggregates stats from game_statistic table for each player in the game.
 $player_query = "
     SELECT 
-        pg.team_id, p.id AS player_id, p.first_name, p.last_name, pg.jersey_number, pg.is_playing,
-        COALESCE(SUM(CASE WHEN s.statistic_name = '1PM' THEN gs.value ELSE 0 END), 0) AS `1PM`,
-        COALESCE(SUM(CASE WHEN s.statistic_name = '2PM' THEN gs.value ELSE 0 END), 0) AS `2PM`,
-        COALESCE(SUM(CASE WHEN s.statistic_name = '3PM' THEN gs.value ELSE 0 END), 0) AS `3PM`,
-        COALESCE(SUM(CASE WHEN s.statistic_name = 'FOUL' THEN gs.value ELSE 0 END), 0) AS `FOUL`,
-        COALESCE(SUM(CASE WHEN s.statistic_name = 'REB' THEN gs.value ELSE 0 END), 0) AS `REB`,
-        COALESCE(SUM(CASE WHEN s.statistic_name = 'AST' THEN gs.value ELSE 0 END), 0) AS `AST`,
-        COALESCE(SUM(CASE WHEN s.statistic_name = 'BLK' THEN gs.value ELSE 0 END), 0) AS `BLK`,
-        COALESCE(SUM(CASE WHEN s.statistic_name = 'STL' THEN gs.value ELSE 0 END), 0) AS `STL`,
-        COALESCE(SUM(CASE WHEN s.statistic_name = 'TO' THEN gs.value ELSE 0 END), 0) AS `TO`
+        pg.team_id, p.id AS player_id, p.first_name, p.last_name, pg.jersey_number, pg.is_playing, pg.display_order,
+        COALESCE(SUM(CASE WHEN gl.action_type = '1PM' THEN 1 ELSE 0 END), 0) AS `1PM`,
+        COALESCE(SUM(CASE WHEN gl.action_type = '2PM' THEN 1 ELSE 0 END), 0) AS `2PM`,
+        COALESCE(SUM(CASE WHEN gl.action_type = '3PM' THEN 1 ELSE 0 END), 0) AS `3PM`,
+        COALESCE(SUM(CASE WHEN gl.action_type = 'FOUL' OR gl.action_type = 'FOUL_OFFENSIVE' THEN 1 ELSE 0 END), 0) AS `FOUL`,
+        COALESCE(SUM(CASE WHEN gl.action_type = 'REB' THEN 1 ELSE 0 END), 0) AS `REB`,
+        COALESCE(SUM(CASE WHEN gl.action_type = 'AST' THEN 1 ELSE 0 END), 0) AS `AST`,
+        COALESCE(SUM(CASE WHEN gl.action_type = 'BLK' THEN 1 ELSE 0 END), 0) AS `BLK`,
+        COALESCE(SUM(CASE WHEN gl.action_type = 'STL' THEN 1 ELSE 0 END), 0) AS `STL`,
+        COALESCE(SUM(CASE WHEN gl.action_type = 'TO' THEN 1 ELSE 0 END), 0) AS `TO`
     FROM player_game pg
     JOIN player p ON p.id = pg.player_id
-    LEFT JOIN game_statistic gs ON pg.player_id = gs.player_id AND pg.game_id = gs.game_id
-    LEFT JOIN statistic s ON gs.statistic_id = s.id
+    LEFT JOIN game_log gl ON pg.player_id = gl.player_id 
+                         AND pg.game_id = gl.game_id 
+                         AND gl.is_undone = 0
     WHERE pg.game_id = ?
-    GROUP BY pg.team_id, p.id
+    GROUP BY pg.team_id, p.id, p.first_name, p.last_name, pg.jersey_number, pg.is_playing, pg.display_order
     ORDER BY pg.team_id, pg.is_playing DESC, pg.display_order ASC
 ";
 $stats_stmt = $pdo->prepare($player_query);
