@@ -1,4 +1,5 @@
 <?php
+//db.php
 // Load database configuration
 $config = include('config.php');
 

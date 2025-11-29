@@ -110,7 +110,7 @@ try {
     // 4. Finally, update the game record to 'Active' and clear the winner.
     $updateStmt = $pdo->prepare("
         UPDATE game 
-        SET game_status = 'Active', winnerteam_id = NULL 
+        SET game_status = NULL, winnerteam_id = NULL 
         WHERE id = ?
     ");
     $updateStmt->execute([$game_id]);
