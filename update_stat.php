@@ -4,7 +4,9 @@
 // Uses `ON DUPLICATE KEY UPDATE` to efficiently handle stat increments/decrements.
 
 require_once 'db.php';
+session_start();
 header('Content-Type: application/json'); // Respond with JSON
+require_once 'includes/auth_functions.php';
 
 // --- 1. Get Input ---
 $data = json_decode(file_get_contents('php://input'), true);
@@ -18,6 +20,12 @@ $value = isset($data['value']) ? (int)$data['value'] : 0; // The amount to add (
 // --- 2. Validate Input ---
 if (!$game_id || !$player_id || !$team_id || !$stat_name || !$value) {
     echo json_encode(['success' => false, 'error' => 'Missing data']);
+    exit;
+}
+
+// --- Authorization Check ---
+if (!isset($_SESSION['user_id']) || !has_league_permission($pdo, $_SESSION['user_id'], 'game', $game_id)) {
+    echo json_encode(['success' => false, 'error' => 'You do not have permission to update stats for this game.']);
     exit;
 }
 
