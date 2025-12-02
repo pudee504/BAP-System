@@ -17,6 +17,16 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// --- Authorization Check ---
+require_once 'includes/auth_functions.php';
+$game_id = $_GET['game_id'] ?? '';
+if (!has_league_permission($pdo, $_SESSION['user_id'], 'game', $game_id)) {
+    $_SESSION['error'] = 'You do not have permission to manage this game.';
+    log_action('AUTH_FAILURE', 'FAILURE', "User {$_SESSION['user_id']} failed permission check for game {$game_id} on manage_game.php");
+    header('Location: dashboard.php');
+    exit;
+}
+
 // --- GAME SETUP ---
 $game_id = $_GET['game_id'] ?? '';
 if (!$game_id) {

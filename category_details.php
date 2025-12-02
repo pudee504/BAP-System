@@ -15,6 +15,15 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// --- AUTHORIZATION CHECK ---
+require_once 'includes/auth_functions.php';
+$category_id_auth = (int) ($_GET['category_id'] ?? 0);
+if (!has_league_permission($pdo, $_SESSION['user_id'], 'category', $category_id_auth)) {
+    $_SESSION['error'] = 'You do not have permission to view this category.';
+    header('Location: dashboard.php');
+    exit;
+}
+
 // Validate category ID from URL
 $category_id = $_GET['category_id'] ?? '';
 if (!$category_id) {
