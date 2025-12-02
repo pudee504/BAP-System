@@ -5,6 +5,7 @@
 require 'db.php';
 session_start();
 require_once 'logger.php';
+require_once 'includes/auth_functions.php';
 
 // --- 1. Validate Request Method ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -15,6 +16,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$team_id || !$category_id) {
         log_action('DELETE_TEAM', 'FAILURE', 'Attempted to delete a team with missing information.');
         die("Missing information.");
+    }
+
+    // --- Authorization Check ---
+    if (!has_league_permission($pdo, $_SESSION['user_id'], 'team', $team_id)) {
+        $_SESSION['error'] = 'You do not have permission to delete this team.';
+        log_action('AUTH_FAILURE', 'FAILURE', "User {$_SESSION['user_id']} failed permission check for team {$team_id} on delete_team.php");
+        header('Location: dashboard.php');
+        exit;
     }
 
     // --- 3. Security Check: Prevent deletion if category is locked ---

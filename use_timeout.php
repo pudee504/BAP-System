@@ -4,8 +4,10 @@
 // Decrements the remaining timeouts for the specified team and period (half/OT).
 
 require_once 'db.php'; // Database connection
-
+session_start();
 header('Content-Type: application/json'); // Respond with JSON
+require_once 'includes/auth_functions.php';
+
 $input = json_decode(file_get_contents('php://input'), true);
 
 // --- 1. Get Input ---
@@ -16,6 +18,12 @@ $period = $input['half'] ?? null; // 'half' represents the period (1=1st H, 2=2n
 // --- 2. Validate Input ---
 if (!$game_id || !$team_id || !$period) {
     echo json_encode(['success' => false, 'error' => 'Missing required parameters.']);
+    exit;
+}
+
+// --- Authorization Check ---
+if (!isset($_SESSION['user_id']) || !has_league_permission($pdo, $_SESSION['user_id'], 'game', $game_id)) {
+    echo json_encode(['success' => false, 'error' => 'You do not have permission to use a timeout for this game.']);
     exit;
 }
 
