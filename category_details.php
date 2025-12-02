@@ -7,6 +7,7 @@
 
 session_start();
 require_once 'includes/category_info.php'; // Prevents multiple inclusion
+require_once 'logger.php'; 
 
 // Redirect to login if not authenticated
 if (!isset($_SESSION['user_id'])) {
@@ -19,6 +20,15 @@ if (!isset($_SESSION['user_id'])) {
 $category_id = $_GET['category_id'] ?? '';
 if (!$category_id) {
     die("Invalid category ID.");
+}
+
+// --- AUTHORIZATION CHECK ---
+require_once 'includes/auth_functions.php';
+$category_id_auth = (int) ($_GET['category_id'] ?? 0);
+if (!has_league_permission($pdo, $_SESSION['user_id'], 'category', $category_id_auth)) {
+    $_SESSION['error'] = 'You do not have permission to view this category.';
+    header('Location: dashboard.php');
+    exit;
 }
 
 // Fetch league name for title and breadcrumb

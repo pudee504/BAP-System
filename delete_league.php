@@ -9,16 +9,14 @@ require_once 'logger.php'; // For logging actions
 // --- 1. Validate Input & Permissions ---
 $league_id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
 
-// Ensure the user is an Admin.
-if ($_SESSION['role_name'] !== 'Admin') {
-    log_action('DELETE_LEAGUE', 'FAILURE', 'Non-admin user attempted to delete a league.');
-    die("You are not authorized to delete leagues.");
-}
+// --- Authorization Check ---
+require_once 'includes/auth_functions.php';
 
-// Ensure a valid league ID was provided.
-if (!$league_id) {
-    log_action('DELETE_LEAGUE', 'FAILURE', 'Attempted to delete a league with an invalid ID.');
-    die("Invalid league ID.");
+if (!$league_id || !has_league_permission($pdo, $_SESSION['user_id'], 'league', $league_id)) {
+    $_SESSION['error'] = 'You do not have permission to delete this league.';
+    log_action('AUTH_FAILURE', 'FAILURE', "User {$_SESSION['user_id']} failed permission check for league {$league_id} on delete_league.php");
+    header('Location: dashboard.php');
+    exit;
 }
 
 try {

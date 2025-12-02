@@ -13,6 +13,16 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// --- Authorization Check ---
+require_once 'includes/auth_functions.php';
+$league_id = (int) ($_REQUEST['league_id'] ?? 0); // Use $_REQUEST to handle both GET and POST
+if (!has_league_permission($pdo, $_SESSION['user_id'], 'league', $league_id)) {
+    $_SESSION['error'] = 'You do not have permission to add a category to this league.';
+    log_action('AUTH_FAILURE', 'FAILURE', "User {$_SESSION['user_id']} failed permission check for league {$league_id} on add_category.php");
+    header('Location: dashboard.php');
+    exit;
+}
+
 // --- Initial Page Load (GET request) ---
 // Validate the league_id from the URL.
 if (!isset($_GET['league_id']) || !filter_var($_GET['league_id'], FILTER_VALIDATE_INT, ["options" => ["min_range" => 1]])) {

@@ -6,6 +6,7 @@
 require 'db.php';
 session_start();
 require_once 'logger.php';
+require_once 'includes/auth_functions.php';
 
 // --- 1. Validate Request Method ---
 // This page should only be accessed via POST.
@@ -23,6 +24,13 @@ if (!$category_id || !$team_name) {
     die("Missing category or team name.");
 }
 
+// --- Authorization Check ---
+if (!has_league_permission($pdo, $_SESSION['user_id'], 'category', $category_id)) {
+    $_SESSION['error'] = 'You do not have permission to add a team to this category.';
+    log_action('AUTH_FAILURE', 'FAILURE', "User {$_SESSION['user_id']} failed permission check for category {$category_id} on add_team.php");
+    header('Location: dashboard.php'); // Redirect to a safe page
+    exit;
+}
 // --- 3. Fetch Category Information ---
 // Get the category's max teams, format, and group settings.
 $stmt = $pdo->prepare("

@@ -13,6 +13,15 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// --- Authorization Check ---
+require_once 'includes/auth_functions.php';
+$category_id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
+if (!has_league_permission($pdo, $_SESSION['user_id'], 'category', $category_id)) {
+    $_SESSION['error'] = 'You do not have permission to edit this category.';
+    log_action('AUTH_FAILURE', 'FAILURE', "User {$_SESSION['user_id']} failed permission check for category {$category_id} on edit_category.php");
+    header('Location: dashboard.php');
+    exit;
+}
 // --- Validate URL parameters ---
 // Get the category ID and league ID from the URL.
 $category_id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);

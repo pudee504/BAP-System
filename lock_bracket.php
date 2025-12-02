@@ -6,6 +6,7 @@
 session_start();
 require_once 'db.php'; 
 require_once 'logger.php'; 
+require_once 'includes/auth_functions.php';
 
 // --- 1. VALIDATE INPUT ---
 // Get category ID from the POST request.
@@ -17,6 +18,13 @@ if (!$category_id) {
     exit;
 }
 
+// --- Authorization Check ---
+if (!isset($_SESSION['user_id']) || !has_league_permission($pdo, $_SESSION['user_id'], 'category', $category_id)) {
+    $_SESSION['error'] = 'You do not have permission to lock this bracket.';
+    log_action('AUTH_FAILURE', 'FAILURE', "User {$_SESSION['user_id']} failed permission check for category {$category_id} on lock_bracket.php");
+    header('Location: dashboard.php');
+    exit;
+}
 try {
     // --- 2. VERIFY ALL TEAMS ARE PRESENT ---
     // Check if the current number of teams matches the required number for the category.

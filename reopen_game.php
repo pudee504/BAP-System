@@ -4,7 +4,10 @@
 // This reverses standings updates.
 
 header('Content-Type: application/json');
+session_start();
 require_once 'db.php';
+require_once 'includes/auth_functions.php';
+
 // You will need winner_logic.php if you implement bracket reversal
 // require_once 'winner_logic.php'; 
 
@@ -16,6 +19,12 @@ if (!$game_id) {
     exit;
 }
 
+// --- Authorization Check ---
+if (!isset($_SESSION['user_id']) || !has_league_permission($pdo, $_SESSION['user_id'], 'game', $game_id)) {
+    echo json_encode(['success' => false, 'error' => 'You do not have permission to reopen this game.']);
+    // log_action('AUTH_FAILURE', 'FAILURE', "User {$_SESSION['user_id']} failed permission check for game {$game_id} on reopen_game.php");
+    exit;
+}
 try {
     $pdo->beginTransaction();
 

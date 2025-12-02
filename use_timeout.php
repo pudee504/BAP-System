@@ -2,8 +2,10 @@
 // FILENAME: use_timeout.php
 // DESCRIPTION: API endpoint called when a team uses a timeout during a game.
 // Decrements the remaining timeouts for the specified team and period (half/OT).
+session_start();
 
 require_once 'db.php'; // Database connection
+require_once 'includes/auth_functions.php';
 
 header('Content-Type: application/json'); // Respond with JSON
 $input = json_decode(file_get_contents('php://input'), true);
@@ -19,6 +21,11 @@ if (!$game_id || !$team_id || !$period) {
     exit;
 }
 
+// --- Authorization Check ---
+if (!isset($_SESSION['user_id']) || !has_league_permission($pdo, $_SESSION['user_id'], 'game', $game_id)) {
+    echo json_encode(['success' => false, 'error' => 'You do not have permission to use a timeout for this game.']);
+    exit;
+}
 try {
     // --- 3. Database Update (Transaction) ---
     $pdo->beginTransaction();

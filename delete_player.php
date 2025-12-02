@@ -16,6 +16,14 @@ if (!$id || !$team_id) {
     die("Invalid ID provided.");
 }
 
+// --- Authorization Check ---
+require_once 'includes/auth_functions.php';
+if (!has_league_permission($pdo, $_SESSION['user_id'], 'player', $id)) {
+    $_SESSION['error'] = 'You do not have permission to remove this player.';
+    log_action('AUTH_FAILURE', 'FAILURE', "User {$_SESSION['user_id']} failed permission check for player {$id} on delete_player.php");
+    header('Location: dashboard.php');
+    exit;
+}
 $pdo->beginTransaction();
 
 try {

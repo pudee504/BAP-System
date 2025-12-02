@@ -14,6 +14,14 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// --- AUTHORIZATION CHECK ---
+require_once 'includes/auth_functions.php';
+$team_id_auth = (int) ($_GET['team_id'] ?? 0);
+if (!has_league_permission($pdo, $_SESSION['user_id'], 'team', $team_id_auth)) {
+    $_SESSION['error'] = 'You do not have permission to view this team.';
+    header('Location: dashboard.php');
+    exit;
+}
 // --- 1. Get and Validate Team ID ---
 $team_id = filter_var($_GET['team_id'] ?? null, FILTER_VALIDATE_INT);
 if (!$team_id) {

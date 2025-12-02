@@ -2,8 +2,11 @@
 // FILENAME: update_game_scores.php
 // DESCRIPTION: API endpoint to update the home and away scores for a specific game.
 // Typically called by the manage_game.php interface when points are added/removed.
+session_start();
 
 require_once 'db.php';
+require_once 'includes/auth_functions.php';
+
 header('Content-Type: application/json'); // Respond with JSON
 
 // --- 1. Get Input ---
@@ -18,6 +21,11 @@ if (!$game_id) {
     exit;
 }
 
+// --- Authorization Check ---
+if (!isset($_SESSION['user_id']) || !has_league_permission($pdo, $_SESSION['user_id'], 'game', $game_id)) {
+    echo json_encode(['success' => false, 'error' => 'You do not have permission to update scores for this game.']);
+    exit;
+}
 try {
     // --- 3. Update Database ---
     // Prepare and execute the UPDATE statement.

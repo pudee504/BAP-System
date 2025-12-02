@@ -2,8 +2,10 @@
 // FILENAME: update_stat.php
 // DESCRIPTION: API endpoint to add or subtract a statistic value for a player in a game.
 // Uses `ON DUPLICATE KEY UPDATE` to efficiently handle stat increments/decrements.
-
+session_start();
 require_once 'db.php';
+require_once 'includes/auth_functions.php';
+
 header('Content-Type: application/json'); // Respond with JSON
 
 // --- 1. Get Input ---
@@ -21,6 +23,11 @@ if (!$game_id || !$player_id || !$team_id || !$stat_name || !$value) {
     exit;
 }
 
+// --- Authorization Check ---
+if (!isset($_SESSION['user_id']) || !has_league_permission($pdo, $_SESSION['user_id'], 'game', $game_id)) {
+    echo json_encode(['success' => false, 'error' => 'You do not have permission to update stats for this game.']);
+    exit;
+}
 // --- 3. Get Statistic ID ---
 // Find the numeric ID corresponding to the statistic name (e.g., '2PM' -> 2).
 $stmt = $pdo->prepare("SELECT id FROM statistic WHERE statistic_name = ?");

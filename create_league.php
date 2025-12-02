@@ -15,6 +15,13 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// --- ADMIN-ONLY AUTHORIZATION ---
+if (!isset($_SESSION['role_name']) || $_SESSION['role_name'] !== 'Admin') {
+    $_SESSION['error'] = 'You do not have permission to create a new league.';
+    header('Location: dashboard.php');
+    exit;
+}
+
 // --- INITIALIZE VARIABLES ---
 $league_name = '';
 $location = '';

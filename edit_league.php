@@ -12,6 +12,15 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// --- Authorization Check ---
+require_once 'includes/auth_functions.php';
+$league_id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
+if (!has_league_permission($pdo, $_SESSION['user_id'], 'league', $league_id)) {
+    $_SESSION['error'] = 'You do not have permission to edit this league.';
+    log_action('AUTH_FAILURE', 'FAILURE', "User {$_SESSION['user_id']} failed permission check for league {$league_id} on edit_league.php");
+    header('Location: dashboard.php');
+    exit;
+}
 // --- Validate league ID ---
 $league_id = filter_var($_GET['id'] ?? null, FILTER_VALIDATE_INT);
 if (!$league_id) {

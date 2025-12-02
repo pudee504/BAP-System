@@ -5,8 +5,10 @@
 // and advance teams in brackets (if applicable).
 
 header('Content-Type: application/json');
+session_start();
 require_once 'db.php';
 require_once 'winner_logic.php'; // Required for bracket advancement logic
+require_once 'includes/auth_functions.php';
 
 try {
     // --- 1. Get Input ---
@@ -16,6 +18,11 @@ try {
 
     if (!$game_id) {
         throw new Exception('Invalid game ID provided.');
+    }
+
+    // --- Authorization Check ---
+    if (!isset($_SESSION['user_id']) || !has_league_permission($pdo, $_SESSION['user_id'], 'game', $game_id)) {
+        throw new Exception('You do not have permission to save the winner for this game.');
     }
 
     // --- 2. Start Transaction ---
