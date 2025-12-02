@@ -15,6 +15,15 @@ if (!$category_id || !$league_id) {
     die("Invalid category or league.");
 }
 
+// --- Authorization Check ---
+require_once 'includes/auth_functions.php';
+if (!has_league_permission($pdo, $_SESSION['user_id'], 'category', $category_id)) {
+    $_SESSION['error'] = 'You do not have permission to delete this category.';
+    log_action('AUTH_FAILURE', 'FAILURE', "User {$_SESSION['user_id']} failed permission check for category {$category_id} on delete_category.php");
+    header('Location: dashboard.php');
+    exit;
+}
+
 try {
     // --- 2. Get Category Name (for logging) ---
     // Fetch the name *before* deleting it.

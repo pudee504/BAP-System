@@ -53,6 +53,18 @@ if (!empty($query)) {
 <?php include 'includes/header.php'; ?>
 
 <div class="dashboard-container">
+
+    <?php
+    // --- Display Session Messages ---
+    if (isset($_SESSION['error'])) {
+        echo '<div class="form-error" style="margin-bottom: 1.5rem;">' . htmlspecialchars($_SESSION['error']) . '</div>';
+        unset($_SESSION['error']); // Clear the message so it only shows once
+    }
+    if (isset($_SESSION['success'])) {
+        echo '<div class="success-message" style="margin-bottom: 1.5rem;">' . htmlspecialchars($_SESSION['success']) . '</div>';
+        unset($_SESSION['success']); // Clear the message
+    }
+    ?>
     
     <div class="dashboard-header">
         <h1>Leagues</h1>

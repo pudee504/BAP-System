@@ -15,6 +15,15 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// --- AUTHORIZATION CHECK ---
+require_once 'includes/auth_functions.php';
+$league_id_auth = (int) ($_GET['id'] ?? 0);
+if (!has_league_permission($pdo, $_SESSION['user_id'], 'league', $league_id_auth)) {
+    $_SESSION['error'] = 'You do not have permission to view this league.';
+    header('Location: dashboard.php');
+    exit;
+}
+
 // --- VALIDATE AND SANITIZE LEAGUE ID ---
 if (!isset($_GET['id'])) {
     echo "No league ID provided.";

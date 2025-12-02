@@ -13,6 +13,16 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
+// --- Authorization Check ---
+require_once 'includes/auth_functions.php';
+$team_id = filter_input(INPUT_GET, 'team_id', FILTER_VALIDATE_INT);
+if (!has_league_permission($pdo, $_SESSION['user_id'], 'team', $team_id)) {
+    $_SESSION['error'] = 'You do not have permission to edit this team.';
+    log_action('AUTH_FAILURE', 'FAILURE', "User {$_SESSION['user_id']} failed permission check for team {$team_id} on edit_team.php");
+    header('Location: dashboard.php');
+    exit;
+}
+
 // --- 1. Get and Validate Team ID ---
 $team_id = filter_input(INPUT_GET, 'team_id', FILTER_VALIDATE_INT);
 if (!$team_id) {
